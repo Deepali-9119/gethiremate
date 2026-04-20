@@ -12,7 +12,7 @@ import {
   type QA,
 } from "@/lib/hiremate";
 import { MetricBar } from "@/components/MetricBar";
-import { ArrowRight, Send, Sparkles, Flag } from "lucide-react";
+import { ArrowRight, Send, Sparkles, Flag, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
@@ -96,6 +96,21 @@ function Interview() {
     }, 900);
   };
 
+  const redo = (qaId: string) => {
+    // Find the answer that produced this feedback and restore it for editing
+    const feedbackIdx = turns.findIndex((t) => t.kind === "ai-feedback" && t.qa.id === qaId);
+    if (feedbackIdx === -1) return;
+    // Walk back to find the user-answer just before
+    const answerTurn = turns[feedbackIdx - 1];
+    const prevText = answerTurn?.kind === "user-answer" ? answerTurn.text : "";
+    // Trim everything from the user answer onward (keeps the question intact)
+    setTurns((t) => t.slice(0, feedbackIdx - 1));
+    setQas((q) => q.filter((x) => x.id !== qaId));
+    setInput(prevText);
+    setDone(false);
+    setTimeout(() => taRef.current?.focus(), 50);
+  };
+
   const finish = () => {
     const { overall, score } = aggregate(qas);
     const interview: Interview = {
@@ -170,6 +185,9 @@ function Interview() {
             }
             // feedback card
             const m = t.qa.metrics;
+            const isLatestFeedback =
+              i === turns.length - 1 ||
+              (i === turns.length - 2 && turns[turns.length - 1]?.kind === "ai-question");
             return (
               <div key={i} className="flex items-start gap-3">
                 <Avatar />
@@ -194,6 +212,16 @@ function Interview() {
                     <MetricBar label="Confidence" value={m.confidence} />
                     <MetricBar label="Relevance" value={m.relevance} />
                   </div>
+                  {isLatestFeedback && !thinking && (
+                    <div className="mt-4 pt-4 border-t border-border/60 flex justify-end">
+                      <button
+                        onClick={() => redo(t.qa.id)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-medium hover:bg-secondary transition"
+                      >
+                        <RotateCcw className="h-3 w-3" /> Redo this answer
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );

@@ -92,23 +92,41 @@ function Scorecard() {
           </div>
         </div>
 
-        {/* Insights */}
-        <div className="mt-10">
-          <h2 className="font-display text-2xl font-semibold mb-1">Three things to take away</h2>
-          <p className="text-sm text-muted-foreground mb-6">
-            Specific, doable, and based on what you actually said.
-          </p>
-
-          <div className="grid sm:grid-cols-3 gap-4">
-            {topInsights(interview).map((tip, i) => (
-              <div
-                key={i}
-                className="rounded-2xl bg-card border border-border/70 p-5 hover:shadow-warm transition"
-              >
-                <div className="text-3xl font-display text-coral mb-2">{i + 1}</div>
-                <p className="text-sm leading-relaxed">{tip}</p>
-              </div>
-            ))}
+        {/* Strengths + Improvements */}
+        <div className="mt-10 grid md:grid-cols-2 gap-6">
+          <div>
+            <h2 className="font-display text-2xl font-semibold mb-1">Top 3 strengths</h2>
+            <p className="text-sm text-muted-foreground mb-5">
+              Lean into these — they're already landing.
+            </p>
+            <div className="space-y-3">
+              {topStrengths(interview).map((tip, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl bg-card border border-border/70 p-5 hover:shadow-warm transition flex gap-4"
+                >
+                  <div className="text-2xl font-display text-success shrink-0">{i + 1}</div>
+                  <p className="text-sm leading-relaxed">{tip}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h2 className="font-display text-2xl font-semibold mb-1">Top 3 to improve</h2>
+            <p className="text-sm text-muted-foreground mb-5">
+              Specific, doable, and based on what you actually said.
+            </p>
+            <div className="space-y-3">
+              {topInsights(interview).map((tip, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl bg-card border border-border/70 p-5 hover:shadow-warm transition flex gap-4"
+                >
+                  <div className="text-2xl font-display text-coral shrink-0">{i + 1}</div>
+                  <p className="text-sm leading-relaxed">{tip}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -177,4 +195,16 @@ function topInsights(i: Interview): string[] {
     relevance: "Mirror the question's keywords in your opening sentence — it signals you actually heard it.",
   };
   return entries.slice(0, 3).map(([k]) => tips[k]);
+}
+
+function topStrengths(i: Interview): string[] {
+  const m = i.overall;
+  const entries = Object.entries(m).sort((a, b) => b[1] - a[1]) as [keyof typeof m, number][];
+  const wins: Record<string, string> = {
+    clarity: "Your sentences are crisp — interviewers can follow you without re-reading.",
+    structure: "You frame stories with a real arc. That makes you memorable, not just heard.",
+    confidence: "You speak with ownership — 'I led', 'I shipped'. That signals senior thinking.",
+    relevance: "You stay locked on what was actually asked. No tangents, no filler.",
+  };
+  return entries.slice(0, 3).map(([k]) => wins[k]);
 }
