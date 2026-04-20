@@ -1,0 +1,295 @@
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { SiteHeader } from "@/components/SiteHeader";
+import { useEffect, useRef, useState } from "react";
+import {
+  aggregate,
+  generateQuestion,
+  getProfile,
+  nextDifficulty,
+  saveInterview,
+  scoreAnswer,
+  type Interview,
+  type QA,
+} from "@/lib/hiremate";
+import { MetricBar } from "@/components/MetricBar";
+import { ArrowRight, Send, Sparkles, Flag } from "lucide-react";
+
+export const Route = createFileRoute("/interview")({
+  head: () => ({
+    meta: [
+      { title: "Mock interview in progress — HireMate" },
+      { name: "description", content: "Live conversational interview with adaptive AI questions and per-answer feedback." },
+    ],
+  }),
+  component: Interview,
+});
+
+const TOTAL = 5;
+
+type Turn =
+  | { kind: "ai-question"; text: string; difficulty: "easy" | "medium" | "hard" }
+  | { kind: "user-answer"; text: string }
+  | { kind: "ai-feedback"; qa: QA };
+
+function Interview() {
+  const navigate = useNavigate();
+  const [profile] = useState(() => (typeof window !== "undefined" ? getProfile() : null));
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [qas, setQas] = useState<QA[]>([]);
+  const [input, setInput] = useState("");
+  const [thinking, setThinking] = useState(false);
+  const [done, setDone] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Bootstrap first question
+  useEffect(() => {
+    if (!profile) {
+      navigate({ to: "/onboarding" });
+      return;
+    }
+    const { question, difficulty } = generateQuestion(profile.role, "medium", []);
+    setTurns([{ kind: "ai-question", text: question, difficulty }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [turns, thinking]);
+
+  if (!profile) return null;
+
+  const currentQ = [...turns].reverse().find((t) => t.kind === "ai-question") as
+    | { kind: "ai-question"; text: string; difficulty: "easy" | "medium" | "hard" }
+    | undefined;
+  const lastAnswered = qas.length;
+  const canEnd = lastAnswered >= TOTAL;
+
+  const submit = () => {
+    const v = input.trim();
+    if (!v || !currentQ || thinking) return;
+    setInput("");
+    setTurns((t) => [...t, { kind: "user-answer", text: v }]);
+    setThinking(true);
+
+    setTimeout(() => {
+      const qa = scoreAnswer(currentQ.text, v);
+      qa.difficulty = currentQ.difficulty;
+      const newQas = [...qas, qa];
+      setQas(newQas);
+      setTurns((t) => [...t, { kind: "ai-feedback", qa }]);
+
+      if (newQas.length >= TOTAL) {
+        setThinking(false);
+        setDone(true);
+        return;
+      }
+
+      // Next adaptive question
+      setTimeout(() => {
+        const diff = nextDifficulty(qa.metrics);
+        const asked = turns.filter((t) => t.kind === "ai-question").map((t: any) => t.text);
+        const { question } = generateQuestion(profile.role, diff, [...asked, currentQ.text]);
+        setTurns((t) => [...t, { kind: "ai-question", text: question, difficulty: diff }]);
+        setThinking(false);
+      }, 600);
+    }, 900);
+  };
+
+  const finish = () => {
+    const { overall, score } = aggregate(qas);
+    const interview: Interview = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      role: profile.role,
+      level: profile.level,
+      qas,
+      overall,
+      score,
+    };
+    saveInterview(interview);
+    navigate({ to: "/scorecard", search: { id: interview.id } });
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <SiteHeader />
+      <main className="flex-1 flex flex-col max-w-3xl w-full mx-auto px-5 py-6">
+        {/* Status bar */}
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">
+              {profile.level} · {profile.role}
+            </p>
+            <h1 className="font-display text-2xl font-semibold">Interview in progress</h1>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-muted-foreground mb-1.5">
+              Question {Math.min(lastAnswered + (currentQ && !done ? 1 : 0), TOTAL)} / {TOTAL}
+            </div>
+            <div className="h-1.5 w-32 rounded-full bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-coral transition-all duration-500"
+                style={{ width: `${(lastAnswered / TOTAL) * 100}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Chat */}
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto rounded-3xl border border-border/70 bg-card p-5 sm:p-6 space-y-5 min-h-[400px]"
+        >
+          {turns.map((t, i) => {
+            if (t.kind === "ai-question") {
+              return (
+                <div key={i} className="flex items-start gap-3">
+                  <Avatar />
+                  <div className="max-w-[85%]">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-coral-soft text-ink font-medium">
+                        {t.difficulty}
+                      </span>
+                    </div>
+                    <div className="rounded-2xl rounded-tl-md bg-secondary px-5 py-3.5 text-[15px] leading-relaxed font-display">
+                      {t.text}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            if (t.kind === "user-answer") {
+              return (
+                <div key={i} className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-foreground text-background px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
+                    {t.text}
+                  </div>
+                </div>
+              );
+            }
+            // feedback card
+            const m = t.qa.metrics;
+            return (
+              <div key={i} className="flex items-start gap-3">
+                <Avatar />
+                <div className="max-w-[90%] w-full rounded-2xl rounded-tl-md bg-background border border-border/70 p-5 shadow-warm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="h-3.5 w-3.5 text-coral" />
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                      Per-answer feedback
+                    </span>
+                  </div>
+                  <p className="text-sm mb-1">
+                    <span className="text-success font-medium">What worked: </span>
+                    {t.qa.highlight}
+                  </p>
+                  <p className="text-sm mb-4">
+                    <span className="text-coral font-medium">Try next time: </span>
+                    {t.qa.improve}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/60">
+                    <MetricBar label="Clarity" value={m.clarity} />
+                    <MetricBar label="Structure" value={m.structure} />
+                    <MetricBar label="Confidence" value={m.confidence} />
+                    <MetricBar label="Relevance" value={m.relevance} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {thinking && (
+            <div className="flex items-start gap-3">
+              <Avatar />
+              <div className="rounded-2xl rounded-tl-md bg-secondary px-4 py-3 text-sm flex items-center gap-1.5">
+                <Dot /> <Dot delay={0.15} /> <Dot delay={0.3} />
+              </div>
+            </div>
+          )}
+
+          {done && (
+            <div className="flex items-start gap-3">
+              <Avatar />
+              <div className="max-w-[90%] rounded-2xl rounded-tl-md bg-coral-soft px-5 py-4">
+                <p className="font-display text-lg mb-1">That's a wrap. 🎯</p>
+                <p className="text-sm text-ink/80 mb-3">
+                  Your scorecard is ready — let's see where you shine and what to sharpen.
+                </p>
+                <button
+                  onClick={finish}
+                  className="inline-flex items-center gap-2 rounded-full bg-ink text-background px-5 py-2.5 text-sm font-medium hover:opacity-90 transition"
+                >
+                  See scorecard <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Composer */}
+        {!done && (
+          <div className="mt-4">
+            <div className="flex items-end gap-2 rounded-3xl border border-border/70 bg-card p-2 focus-within:border-coral transition">
+              <textarea
+                ref={taRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+                rows={2}
+                placeholder="Take your time. Speak like you'd speak to a real interviewer…"
+                className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+              />
+              <button
+                onClick={submit}
+                disabled={!input.trim() || thinking}
+                className="rounded-2xl bg-foreground text-background h-11 w-11 flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition"
+                aria-label="Send"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground px-2">
+              <span>⌘ + Enter to send</span>
+              {canEnd && (
+                <button
+                  onClick={() => setDone(true)}
+                  className="inline-flex items-center gap-1 hover:text-foreground"
+                >
+                  <Flag className="h-3 w-3" /> End early
+                </button>
+              )}
+              {!canEnd && (
+                <Link to="/dashboard" className="hover:text-foreground">
+                  Save & exit
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Avatar() {
+  return (
+    <div className="h-8 w-8 shrink-0 rounded-full gradient-warm flex items-center justify-center text-xs font-display font-semibold text-ink">
+      H
+    </div>
+  );
+}
+
+function Dot({ delay = 0 }: { delay?: number }) {
+  return (
+    <span
+      className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce"
+      style={{ animationDelay: `${delay}s`, animationDuration: "1s" }}
+    />
+  );
+}
