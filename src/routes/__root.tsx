@@ -29,14 +29,18 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "HireMate — AI Interview Coach" },
+      { name: "description", content: "Practice real interview questions, get actionable feedback, and improve your answers instantly with your AI interview coach." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "HireMate — AI Interview Coach" },
+      { property: "og:description", content: "Practice real interview questions, get actionable feedback, and improve your answers instantly with your AI interview coach." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "HireMate — AI Interview Coach" },
+      { name: "twitter:description", content: "Practice real interview questions, get actionable feedback, and improve your answers instantly with your AI interview coach." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/N3tG1DtPzigCltOgCpNDCN5z6203/social-images/social-1776716574794-IMG_5164.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/N3tG1DtPzigCltOgCpNDCN5z6203/social-images/social-1776716574794-IMG_5164.webp" },
     ],
     links: [
       {
