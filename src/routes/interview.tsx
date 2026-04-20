@@ -12,7 +12,7 @@ import {
   type QA,
 } from "@/lib/hiremate";
 import { MetricBar } from "@/components/MetricBar";
-import { ArrowRight, Send, Sparkles, Flag } from "lucide-react";
+import { ArrowRight, Send, Sparkles, Flag, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
