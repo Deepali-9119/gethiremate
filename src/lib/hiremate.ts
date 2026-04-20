@@ -181,6 +181,29 @@ export function scoreAnswer(question: string, answer: string): QA {
 
   const feedback = `${highlight} ${improve}`;
 
+  // Missing element tags
+  const missing: string[] = [];
+  if (!hasMetric) missing.push("Missing metric");
+  if (!hasStructure && !hasSTAR) missing.push("No clear structure");
+  if (wc < 40) missing.push("Lacks depth");
+  if (overlap(question, a) < 0.15) missing.push("Drifts from question");
+  if (/(maybe|i think|kinda|sort of|i guess)/i.test(a)) missing.push("Hedging language");
+
+  // How to improve — actionable bullets
+  const howToImprove: string[] = [];
+  if (!hasSTAR && /tell me|describe|share/i.test(question)) {
+    howToImprove.push("Structure your answer using the STAR method (Situation → Task → Action → Result).");
+  }
+  if (!hasMetric) howToImprove.push("Add a specific metric — %, users impacted, time saved, revenue.");
+  if (wc < 40) howToImprove.push("Add one concrete example to ground the answer.");
+  if (wc > 180) howToImprove.push("Be more concise — aim for 90–120 words.");
+  if (/(maybe|i think|kinda|sort of|i guess)/i.test(a)) {
+    howToImprove.push("Replace hedges ('I think', 'kinda') with ownership verbs ('I led', 'I shipped').");
+  }
+  if (!howToImprove.length) howToImprove.push("Practice this answer out loud once — pacing is your last 10%.");
+
+  const improvedAnswer = buildImprovedAnswer(question, a);
+
   return {
     id: crypto.randomUUID(),
     question,
@@ -190,8 +213,40 @@ export function scoreAnswer(question: string, answer: string): QA {
     highlight,
     improve,
     metrics,
+    improvedAnswer,
+    howToImprove,
+    missing,
   };
 }
+
+function buildImprovedAnswer(question: string, answer: string): string {
+  const isBehavioral = /tell me|describe|share|time you|proud of|failed|disagreed|prioritize/i.test(question);
+  const isTechnical = /design|architect|debug|scale|reduce|explain|database|sql|system/i.test(question);
+  const seed = answer.split(/[.!?]/)[0]?.trim().slice(0, 90) || "a recent project I led";
+
+  if (isBehavioral) {
+    return [
+      `Situation — Last quarter, ${seed.toLowerCase()}; the team was blocked and the deadline was two weeks out.`,
+      `Task — I owned unblocking us without slipping the date.`,
+      `Action — I split the work into three tracks, paired with engineering daily, and cut scope on the lowest-impact piece.`,
+      `Result — We shipped on time, cut the bug rate by 40%, and the pattern became our default for the next two launches.`,
+    ].join(" ");
+  }
+  if (isTechnical) {
+    return [
+      `First, I'd clarify constraints — read/write ratio, expected scale, latency budget.`,
+      `Then the core path: an API in front of a primary store, with a cache for hot reads.`,
+      `For scale, shard by user_id, push static assets to a CDN, and queue writes async — that gets us under 100ms p95 in similar systems.`,
+      `Trade-off: stronger consistency would cost ~30ms; for this use case, eventual is the right call.`,
+    ].join(" ");
+  }
+  return [
+    `Short version: ${seed}.`,
+    `What made it work was a clear hypothesis up front and one metric we agreed to move.`,
+    `In six weeks we lifted that metric by 25% — and the team kept using the process long after.`,
+  ].join(" ");
+}
+
 
 function clamp(n: number) {
   return Math.max(20, Math.min(98, n));
