@@ -196,3 +196,15 @@ function topInsights(i: Interview): string[] {
   };
   return entries.slice(0, 3).map(([k]) => tips[k]);
 }
+
+function topStrengths(i: Interview): string[] {
+  const m = i.overall;
+  const entries = Object.entries(m).sort((a, b) => b[1] - a[1]) as [keyof typeof m, number][];
+  const wins: Record<string, string> = {
+    clarity: "Your sentences are crisp — interviewers can follow you without re-reading.",
+    structure: "You frame stories with a real arc. That makes you memorable, not just heard.",
+    confidence: "You speak with ownership — 'I led', 'I shipped'. That signals senior thinking.",
+    relevance: "You stay locked on what was actually asked. No tangents, no filler.",
+  };
+  return entries.slice(0, 3).map(([k]) => wins[k]);
+}
