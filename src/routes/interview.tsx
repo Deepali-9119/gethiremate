@@ -96,6 +96,21 @@ function Interview() {
     }, 900);
   };
 
+  const redo = (qaId: string) => {
+    // Find the answer that produced this feedback and restore it for editing
+    const feedbackIdx = turns.findIndex((t) => t.kind === "ai-feedback" && t.qa.id === qaId);
+    if (feedbackIdx === -1) return;
+    // Walk back to find the user-answer just before
+    const answerTurn = turns[feedbackIdx - 1];
+    const prevText = answerTurn?.kind === "user-answer" ? answerTurn.text : "";
+    // Trim everything from the user answer onward (keeps the question intact)
+    setTurns((t) => t.slice(0, feedbackIdx - 1));
+    setQas((q) => q.filter((x) => x.id !== qaId));
+    setInput(prevText);
+    setDone(false);
+    setTimeout(() => taRef.current?.focus(), 50);
+  };
+
   const finish = () => {
     const { overall, score } = aggregate(qas);
     const interview: Interview = {
