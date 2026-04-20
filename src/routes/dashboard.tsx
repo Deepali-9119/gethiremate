@@ -1,14 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getHistory, weakAreas, type Interview } from "@/lib/hiremate";
+import { getHistory, weakAreas, type Interview, type Metric } from "@/lib/hiremate";
+import {
+  buildPracticePlan,
+  doneToday,
+  sessionsThisWeek,
+  smartNudges,
+  streakDays,
+  WEEKLY_GOAL,
+  type PlanDay,
+} from "@/lib/habits";
 import { useEffect, useState } from "react";
-import { ArrowRight, Flame, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  Flame,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  Check,
+  Target,
+  CalendarDays,
+} from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
       { title: "Your dashboard — HireMate" },
-      { name: "description", content: "Track your interview practice progress, weak areas, and past sessions." },
+      { name: "description", content: "Track your interview practice progress, streak, weak areas, and 5-day practice plan." },
     ],
   }),
   component: Dashboard,
@@ -29,6 +47,12 @@ function Dashboard() {
     history.length > 0
       ? Math.round(history.reduce((s, h) => s + h.score, 0) / history.length)
       : 0;
+  const streak = streakDays(history);
+  const todayDone = doneToday(history);
+  const week = sessionsThisWeek(history);
+  const nudges = smartNudges(history);
+  const plan = buildPracticePlan(history);
+  const topWeak = weak[0];
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,12 +75,38 @@ function Dashboard() {
           <EmptyState />
         ) : (
           <>
+            {/* Daily goal + streak strip */}
+            <div className="grid lg:grid-cols-3 gap-4 mb-6">
+              <DailyGoalCard done={todayDone} streak={streak} />
+              <WeeklyGoalCard week={week} />
+              <FocusCard weak={topWeak} />
+            </div>
+
+            {/* Smart nudges */}
+            {nudges.length > 0 && (
+              <div className="rounded-3xl bg-coral-soft/60 border border-coral/20 p-5 mb-10">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-coral" />
+                  <span className="text-xs uppercase tracking-wider text-ink/70 font-medium">
+                    Smart nudges
+                  </span>
+                </div>
+                <ul className="space-y-1.5">
+                  {nudges.map((n, i) => (
+                    <li key={i} className="text-sm text-ink leading-relaxed">
+                      {n}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Top stats */}
             <div className="grid sm:grid-cols-3 gap-4 mb-10">
               <StatCard
                 label="Sessions"
                 value={String(history.length)}
-                hint={history.length === 1 ? "First one — well done." : "Keep the streak alive."}
+                hint={history.length === 1 ? "First one — well done." : "Keep the chain alive."}
                 icon={<Flame className="h-5 w-5 text-coral" />}
               />
               <StatCard
@@ -85,7 +135,7 @@ function Dashboard() {
               />
             </div>
 
-            {/* Weak areas + trend */}
+            {/* Trend + weak areas */}
             <div className="grid lg:grid-cols-3 gap-4 mb-10">
               <div className="rounded-3xl bg-card border border-border/70 p-6 lg:col-span-2">
                 <h2 className="font-display text-xl font-semibold mb-1">Score over time</h2>
@@ -114,8 +164,11 @@ function Dashboard() {
               </div>
             </div>
 
+            {/* Practice plan */}
+            <PracticePlan plan={plan} topWeak={topWeak?.key} />
+
             {/* History */}
-            <div>
+            <div className="mt-10">
               <h2 className="font-display text-2xl font-semibold mb-4">Past interviews</h2>
               <div className="space-y-3">
                 {history.map((h) => (
@@ -147,6 +200,135 @@ function Dashboard() {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+function DailyGoalCard({ done, streak }: { done: boolean; streak: number }) {
+  return (
+    <div className="rounded-3xl bg-card border border-border/70 p-5">
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">Today's goal</span>
+        <Flame className={`h-5 w-5 ${streak > 0 ? "text-coral" : "text-muted-foreground"}`} />
+      </div>
+      <p className="font-display text-lg leading-snug mb-3">Complete 1 mock interview today</p>
+      {done ? (
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-success/15 text-success px-3 py-1 text-xs font-medium">
+          <Check className="h-3.5 w-3.5" /> Done — {streak}-day streak
+        </div>
+      ) : (
+        <Link
+          to="/onboarding"
+          className="inline-flex items-center gap-1.5 rounded-full bg-ink text-background px-3.5 py-1.5 text-xs font-medium hover:opacity-90 transition"
+        >
+          Start today's session <ArrowRight className="h-3 w-3" />
+        </Link>
+      )}
+      {streak > 0 && !done && (
+        <p className="text-xs text-muted-foreground mt-2">
+          You're on a {streak}-day streak — don't drop it tonight.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function WeeklyGoalCard({ week }: { week: number }) {
+  const pct = Math.min(100, (week / WEEKLY_GOAL) * 100);
+  return (
+    <div className="rounded-3xl bg-card border border-border/70 p-5">
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">Weekly goal</span>
+        <CalendarDays className="h-5 w-5 text-coral" />
+      </div>
+      <div className="flex items-baseline gap-1.5 mb-3">
+        <span className="font-display text-3xl font-semibold tabular-nums">{week}</span>
+        <span className="text-sm text-muted-foreground">/ {WEEKLY_GOAL} sessions</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-secondary overflow-hidden mb-2">
+        <div
+          className="h-full bg-coral transition-all duration-700"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {week >= WEEKLY_GOAL
+          ? "Weekly goal hit. Bank an extra one if you're feeling sharp."
+          : `${WEEKLY_GOAL - week} to go this week.`}
+      </p>
+    </div>
+  );
+}
+
+function FocusCard({ weak }: { weak?: { key: keyof Metric; avg: number } }) {
+  if (!weak) return null;
+  return (
+    <div className="rounded-3xl gradient-warm p-5 text-ink">
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-xs uppercase tracking-wider text-ink/70">Top focus area</span>
+        <Target className="h-5 w-5 text-ink" />
+      </div>
+      <p className="font-display text-2xl capitalize font-semibold mb-1">{weak.key} needs work</p>
+      <p className="text-xs text-ink/80 mb-4">Currently averaging {weak.avg}/100.</p>
+      <Link
+        to="/onboarding"
+        className="inline-flex items-center gap-1.5 rounded-full bg-ink text-background px-3.5 py-1.5 text-xs font-medium hover:opacity-90 transition"
+      >
+        Practice this next <ArrowRight className="h-3 w-3" />
+      </Link>
+    </div>
+  );
+}
+
+function PracticePlan({ plan, topWeak }: { plan: PlanDay[]; topWeak?: keyof Metric }) {
+  return (
+    <div className="rounded-3xl bg-card border border-border/70 p-6">
+      <div className="flex items-end justify-between flex-wrap gap-2 mb-1">
+        <h2 className="font-display text-2xl font-semibold">Your 5-day practice plan</h2>
+        <span className="text-xs text-muted-foreground">
+          {topWeak ? `Built around your weakest area: ${topWeak}` : "A balanced starter plan"}
+        </span>
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Twenty minutes a day. Five days. Real measurable lift.
+      </p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {plan.map((d) => (
+          <div
+            key={d.day}
+            className="rounded-2xl border border-border/70 bg-background p-4 hover:shadow-warm transition"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Day {d.day}
+              </span>
+              <span
+                className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium ${
+                  d.focus === "mixed"
+                    ? "bg-secondary text-ink"
+                    : "bg-coral-soft text-ink"
+                }`}
+              >
+                {d.focus}
+              </span>
+            </div>
+            <p className="font-display text-base leading-snug mb-2">{d.title}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed mb-3">{d.brief}</p>
+            <p className="text-xs leading-relaxed">
+              <span className="text-coral font-medium">Drill: </span>
+              {d.drill}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 flex justify-end">
+        <Link
+          to="/onboarding"
+          className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition"
+        >
+          Start day 1 <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
     </div>
   );
 }
