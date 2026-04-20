@@ -24,6 +24,9 @@ export type QA = {
   highlight: string;
   improve: string;
   metrics: Metric;
+  improvedAnswer: string;
+  howToImprove: string[];
+  missing: string[];
 };
 
 export type Interview = {
