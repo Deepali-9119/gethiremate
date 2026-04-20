@@ -147,7 +147,17 @@ export function scoreAnswer(question: string, answer: string): QA {
     relevance: Math.round(relevance),
   };
 
-  const highlight =
+  const avg = (metrics.clarity + metrics.structure + metrics.confidence + metrics.relevance) / 4;
+  const opener =
+    avg >= 80
+      ? "Really strong answer — this is interview-ready. "
+      : avg >= 65
+        ? "You're on the right track. "
+        : avg >= 50
+          ? "Good start, but let's sharpen this. "
+          : "Solid attempt — let's build on it together. ";
+
+  const highlightCore =
     hasMetric
       ? "Strong use of concrete numbers — that lands."
       : hasStructure
@@ -155,6 +165,7 @@ export function scoreAnswer(question: string, answer: string): QA {
         : wc > 60
           ? "Good depth in your reasoning."
           : "Clear and direct — no fluff.";
+  const highlight = opener + highlightCore;
 
   const improve =
     !hasSTAR && /tell me|describe|share/i.test(question)
