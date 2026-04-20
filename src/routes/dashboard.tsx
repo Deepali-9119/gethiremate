@@ -11,7 +11,7 @@ export const Route = createFileRoute("/dashboard")({
       { name: "description", content: "Track your interview practice progress, weak areas, and past sessions." },
     ],
   }),
-  component: Dashboard;
+  component: Dashboard,
 });
 
 function Dashboard() {
