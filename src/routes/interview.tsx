@@ -12,7 +12,14 @@ import {
   type QA,
 } from "@/lib/hiremate";
 import { MetricBar } from "@/components/MetricBar";
-import { ArrowRight, Send, Sparkles, Flag, RotateCcw } from "lucide-react";
+import { ArrowRight, Send, Sparkles, Flag, RotateCcw, Mic, Square } from "lucide-react";
+
+const SAMPLE_TRANSCRIPTS = [
+  "So, in my last role I led the redesign of our onboarding flow. The drop-off was around 38% on step two, so I partnered with design and analytics to run a quick research sprint, then shipped a simplified two-step version. Activation jumped 22% in the first month, and we kept the lift through the next quarter.",
+  "I'd start by clarifying the goal — are we optimizing for engagement, retention, or revenue. Then I'd map the user journey and find the highest-friction step. Once I had a hypothesis, I'd run a small A/B test, watch the leading indicators for two weeks, and only roll out broadly if the metric moved by at least 5%.",
+  "Honestly, the proudest moment was shipping our payments rewrite. We had three weeks, two engineers, and a strict reliability target. I cut scope on the lowest-impact piece, paired daily with the team, and we landed on time with zero production incidents in the first month.",
+  "I think the biggest lesson was learning to push back earlier. I used to absorb scope without questioning it, and that hurt the team. Now I ask two questions up front: what's the success metric, and what are we explicitly not doing. It's saved us weeks more than once.",
+];
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
@@ -55,6 +62,11 @@ function Interview() {
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [done, setDone] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -73,6 +85,14 @@ function Interview() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, thinking]);
 
+  // Cleanup voice timers on unmount
+  useEffect(() => {
+    return () => {
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      if (transcribeTimerRef.current) clearTimeout(transcribeTimerRef.current);
+    };
+  }, []);
+
   if (!profile) return null;
 
   const currentQ = [...turns].reverse().find((t) => t.kind === "ai-question") as
@@ -81,8 +101,8 @@ function Interview() {
   const lastAnswered = qas.length;
   const canEnd = lastAnswered >= TOTAL;
 
-  const submit = () => {
-    const v = input.trim();
+  const submit = (override?: string) => {
+    const v = (override ?? input).trim();
     if (!v || !currentQ || thinking) return;
     setInput("");
     setTurns((t) => [...t, { kind: "user-answer", text: v }]);
@@ -120,6 +140,39 @@ function Interview() {
         }, 1300);
       }, 500);
     }, 900);
+  };
+
+  const startRecording = () => {
+    if (recording || transcribing || thinking) return;
+    setRecording(true);
+    setRecSeconds(0);
+    recTimerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
+  };
+
+  const stopRecording = () => {
+    if (!recording) return;
+    setRecording(false);
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+    recTimerRef.current = null;
+    setTranscribing(true);
+    // Simulate transcription stream into the input
+    const sample = SAMPLE_TRANSCRIPTS[Math.floor(Math.random() * SAMPLE_TRANSCRIPTS.length)];
+    const words = sample.split(" ");
+    let i = 0;
+    setInput("");
+    const tick = () => {
+      i += 1;
+      setInput(words.slice(0, i).join(" "));
+      if (i < words.length) {
+        transcribeTimerRef.current = setTimeout(tick, 35);
+      } else {
+        transcribeTimerRef.current = setTimeout(() => {
+          setTranscribing(false);
+          submit(sample);
+        }, 450);
+      }
+    };
+    transcribeTimerRef.current = setTimeout(tick, 350);
   };
 
   const redo = (qaId: string) => {
@@ -336,30 +389,60 @@ function Interview() {
         {/* Composer */}
         {!done && (
           <div className="mt-4">
-            <div className="flex items-end gap-2 rounded-3xl border border-border/70 bg-card p-2 focus-within:border-coral transition">
-              <textarea
-                ref={taRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    submit();
-                  }
-                }}
-                rows={2}
-                placeholder="Take your time. Speak like you'd speak to a real interviewer…"
-                className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
-              />
-              <button
-                onClick={submit}
-                disabled={!input.trim() || thinking}
-                className="rounded-2xl bg-foreground text-background h-11 w-11 flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition"
-                aria-label="Send"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+            {/* Voice mode hint */}
+            <div className="mb-2 px-2 flex items-center justify-between text-xs">
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <span aria-hidden>🎙</span>
+                <span>
+                  Try voice mode — practice answering out loud like a real interview
+                </span>
+              </span>
             </div>
+
+            {recording || transcribing ? (
+              <RecordingPanel
+                recording={recording}
+                transcribing={transcribing}
+                seconds={recSeconds}
+                preview={input}
+                onStop={stopRecording}
+              />
+            ) : (
+              <div className="flex items-end gap-2 rounded-3xl border border-border/70 bg-card p-2 focus-within:border-coral transition">
+                <textarea
+                  ref={taRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      submit();
+                    }
+                  }}
+                  rows={2}
+                  placeholder="Type your answer, or tap the mic to speak…"
+                  className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                />
+                <button
+                  onClick={startRecording}
+                  disabled={thinking}
+                  className="rounded-2xl border border-coral/30 bg-peach text-ink h-11 w-11 flex items-center justify-center disabled:opacity-30 hover:bg-coral-soft hover:border-coral transition"
+                  aria-label="Record voice answer"
+                  title="Speak your answer"
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => submit()}
+                  disabled={!input.trim() || thinking}
+                  className="rounded-2xl bg-foreground text-background h-11 w-11 flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition"
+                  aria-label="Send"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground px-2">
               <span>⌘ + Enter to send</span>
               {canEnd && (
@@ -397,5 +480,90 @@ function Dot({ delay = 0 }: { delay?: number }) {
       className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce"
       style={{ animationDelay: `${delay}s`, animationDuration: "1s" }}
     />
+  );
+}
+
+function RecordingPanel({
+  recording,
+  transcribing,
+  seconds,
+  preview,
+  onStop,
+}: {
+  recording: boolean;
+  transcribing: boolean;
+  seconds: number;
+  preview: string;
+  onStop: () => void;
+}) {
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+  return (
+    <div className="rounded-3xl border border-coral/30 bg-gradient-to-br from-peach to-coral-soft p-4 sm:p-5">
+      <div className="flex items-center gap-4">
+        {recording ? (
+          <>
+            <div className="relative h-10 w-10 shrink-0">
+              <span className="absolute inset-0 rounded-full bg-coral/30 animate-ping" />
+              <span className="relative h-10 w-10 rounded-full bg-coral grid place-items-center">
+                <span className="h-2.5 w-2.5 rounded-full bg-background" />
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-medium text-ink">Listening… speak your answer</p>
+                <span className="text-xs text-ink/60 tabular-nums">{mm}:{ss}</span>
+              </div>
+              <Waves />
+            </div>
+            <button
+              onClick={onStop}
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink text-background px-4 py-2 text-sm font-medium hover:opacity-90 transition shrink-0"
+            >
+              <Square className="h-3.5 w-3.5" fill="currentColor" /> Stop
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="h-10 w-10 shrink-0 rounded-full bg-ink/10 grid place-items-center">
+              <span className="flex gap-0.5">
+                <Dot /> <Dot delay={0.15} /> <Dot delay={0.3} />
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs uppercase tracking-wider text-ink/60 font-medium mb-1">
+                Transcribing…
+              </p>
+              <p className="text-sm text-ink leading-relaxed line-clamp-2">
+                {preview || "…"}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+      {transcribing && (
+        <p className="mt-3 text-[11px] text-ink/60">
+          We'll auto-send once it's done.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Waves() {
+  return (
+    <div className="flex items-center gap-1 h-5">
+      {[0, 0.1, 0.2, 0.3, 0.4, 0.3, 0.2, 0.1, 0, 0.15].map((d, i) => (
+        <span
+          key={i}
+          className="w-1 rounded-full bg-coral animate-pulse"
+          style={{
+            height: `${30 + (i % 4) * 18}%`,
+            animationDelay: `${d}s`,
+            animationDuration: "0.9s",
+          }}
+        />
+      ))}
+    </div>
   );
 }
