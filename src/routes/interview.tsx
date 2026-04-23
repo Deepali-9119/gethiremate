@@ -101,14 +101,24 @@ function Interview() {
         return;
       }
 
-      // Next adaptive question
+      // Brief acknowledgment, then next adaptive question
       setTimeout(() => {
-        const diff = nextDifficulty(qa.metrics);
-        const asked = turns.filter((t) => t.kind === "ai-question").map((t: any) => t.text);
-        const { question } = generateQuestion(profile.role, diff, [...asked, currentQ.text]);
-        setTurns((t) => [...t, { kind: "ai-question", text: question, difficulty: diff }]);
-        setThinking(false);
-      }, 600);
+        const lastAck = [...turns].reverse().find((tt) => tt.kind === "ai-ack") as
+          | { kind: "ai-ack"; text: string }
+          | undefined;
+        const ack = pickAck(lastAck?.text);
+        setTurns((t) => [...t, { kind: "ai-ack", text: ack }]);
+
+        setTimeout(() => {
+          const diff = nextDifficulty(qa.metrics);
+          const asked = turns
+            .filter((t) => t.kind === "ai-question")
+            .map((t) => (t as { kind: "ai-question"; text: string }).text);
+          const { question } = generateQuestion(profile.role, diff, [...asked, currentQ.text]);
+          setTurns((t) => [...t, { kind: "ai-question", text: question, difficulty: diff }]);
+          setThinking(false);
+        }, 1300);
+      }, 500);
     }, 900);
   };
 
