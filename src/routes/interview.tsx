@@ -93,8 +93,8 @@ function Interview() {
   const lastAnswered = qas.length;
   const canEnd = lastAnswered >= TOTAL;
 
-  const submit = () => {
-    const v = input.trim();
+  const submit = (override?: string) => {
+    const v = (override ?? input).trim();
     if (!v || !currentQ || thinking) return;
     setInput("");
     setTurns((t) => [...t, { kind: "user-answer", text: v }]);
