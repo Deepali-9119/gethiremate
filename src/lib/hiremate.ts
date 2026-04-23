@@ -71,49 +71,176 @@ export const saveInterview = (i: Interview) => {
   localStorage.setItem(KEY_HISTORY, JSON.stringify(all.slice(0, 30)));
 };
 
-// --- Mock adaptive question bank ---
-const BANK: Record<string, string[]> = {
-  behavioral: [
-    "Tell me about a time you disagreed with a teammate. How did you resolve it?",
-    "Describe a project you're most proud of and why.",
-    "Share a moment you failed. What did you take away from it?",
-    "How do you prioritize when everything feels urgent?",
-  ],
-  technical: [
-    "Walk me through how you'd design a URL shortener at scale.",
-    "Explain the difference between SQL and NoSQL — when would you pick each?",
-    "How would you debug a production endpoint that's randomly slow?",
-    "Describe how you'd reduce a React app's time-to-interactive.",
-  ],
-  product: [
-    "Imagine you're PM for a feature with low adoption. What's your first move?",
-    "How would you measure success for a new onboarding flow?",
-    "A stakeholder pushes a feature you disagree with. How do you respond?",
-  ],
-  system: [
-    "Design a notification system that handles 1M users.",
-    "How would you architect a real-time collaborative document editor?",
-  ],
+// --- Role-specific question bank ---
+type Bank = Record<"easy" | "medium" | "hard", string[]>;
+
+const BANKS: Record<string, Bank> = {
+  pm: {
+    easy: [
+      "Walk me through a product you love and why it works.",
+      "What's a recent feature launch you admired? What made it land?",
+      "How do you decide what to build next when everything feels important?",
+    ],
+    medium: [
+      "Imagine you're PM for a feature with low adoption. What's your first move?",
+      "How would you measure success for a new onboarding flow?",
+      "Design a feature to help remote teams feel more connected. Walk me through your thinking.",
+      "A stakeholder pushes a feature you disagree with. How do you respond?",
+      "How would you improve the YouTube search experience?",
+      "Estimate the daily revenue of a coffee shop near a busy office.",
+    ],
+    hard: [
+      "You're PM for Instagram Reels. Engagement is up but creator retention is down. What do you do?",
+      "Design a product for grocery shoppers with dietary restrictions. North-star metric?",
+      "Your team has 6 weeks and a feature that needs 12. How do you cut scope without losing the bet?",
+      "A core metric drops 20% overnight. Walk me through your investigation.",
+    ],
+  },
+  swe: {
+    easy: [
+      "Explain the difference between an array and a linked list. When would you pick each?",
+      "What happens when you type a URL into the browser and hit enter?",
+      "Walk me through how you'd reverse a string in your favorite language.",
+      "What's the difference between == and === in JavaScript?",
+    ],
+    medium: [
+      "Walk me through how you'd design a URL shortener at scale.",
+      "Explain the difference between SQL and NoSQL — when would you pick each?",
+      "How would you debug a production endpoint that's randomly slow?",
+      "Describe how you'd reduce a React app's time-to-interactive.",
+      "Given an array of integers, find two that sum to a target. Walk me through your approach and the complexity.",
+      "Design the data model for a multi-tenant SaaS app.",
+    ],
+    hard: [
+      "Design a notification system that handles 1M concurrent users.",
+      "How would you architect a real-time collaborative document editor?",
+      "Design Twitter's timeline service. What are the trade-offs at 500M users?",
+      "Implement an LRU cache. Walk me through your data structures and the time complexity of each operation.",
+    ],
+  },
+  data: {
+    easy: [
+      "Walk me through how you'd find duplicate rows in a dataset.",
+      "What's the difference between a JOIN and a UNION in SQL?",
+      "How would you explain a confidence interval to a non-technical stakeholder?",
+    ],
+    medium: [
+      "A KPI dropped 15% week-over-week. Walk me through your investigation.",
+      "How would you design an A/B test for a new checkout flow?",
+      "Write a SQL query to find the top 3 products by revenue per month.",
+      "How would you measure whether a marketing campaign actually drove signups?",
+    ],
+    hard: [
+      "How would you build a churn prediction model with limited labeled data?",
+      "Design a dashboard for a CEO who wants 'one number' to track product health. What's the number, and why?",
+      "Walk me through how you'd detect anomalies in a time-series of payments.",
+    ],
+  },
+  ba: {
+    easy: [
+      "Walk me through how you'd gather requirements for a new internal tool.",
+      "What's the difference between a user story and a use case?",
+      "How do you prioritize requests from multiple stakeholders?",
+    ],
+    medium: [
+      "A stakeholder gives you a vague request. How do you turn it into a clear scope?",
+      "Walk me through a process improvement you led and the impact.",
+      "How would you map the current state vs future state of a broken workflow?",
+    ],
+    hard: [
+      "You inherit a project mid-flight with conflicting stakeholder goals. What's your first 2 weeks?",
+      "Design the requirements doc for migrating a legacy CRM to a new platform.",
+    ],
+  },
+  ux: {
+    easy: [
+      "Walk me through your design process from brief to ship.",
+      "What's a recent design decision you made that you'd reconsider today?",
+      "How do you balance user needs with business goals?",
+    ],
+    medium: [
+      "Critique a product's onboarding flow you've used recently.",
+      "How would you redesign the airline check-in experience?",
+      "Walk me through how you'd test a new design with users on a 1-week timeline.",
+    ],
+    hard: [
+      "Design an accessibility-first banking app for users 65+.",
+      "Your engineering team says your design is 'too complex to build.' How do you respond?",
+    ],
+  },
+  behavioral: {
+    easy: [
+      "Tell me about yourself.",
+      "Why are you interested in this role?",
+      "What's a project you're most proud of?",
+    ],
+    medium: [
+      "Tell me about a time you disagreed with a teammate. How did you resolve it?",
+      "Describe a challenge you faced and how you handled it.",
+      "Tell me about a time you handled conflict on a team.",
+      "Share a moment you failed. What did you take away from it?",
+      "How do you prioritize when everything feels urgent?",
+      "Tell me about a time you had to give difficult feedback.",
+    ],
+    hard: [
+      "Tell me about the hardest decision you've made in the last year.",
+      "Describe a time you went against the consensus and were proven right — or wrong.",
+      "Walk me through a moment you led without authority.",
+    ],
+  },
 };
+
+function bucketsForRole(role: string): string[] {
+  const r = role.toLowerCase();
+  if (r.includes("behavioral") || r.includes("hr")) return ["behavioral"];
+  if (r.includes("engineer") || r.includes("developer") || r.includes("swe") || r.includes("software")) {
+    return ["swe", "behavioral"];
+  }
+  if (r.includes("product manager") || r.includes("product")) return ["pm", "behavioral"];
+  if (r.includes("data")) return ["data", "behavioral"];
+  if (r.includes("business analyst") || r.includes("business")) return ["ba", "behavioral"];
+  if (r.includes("ux") || r.includes("design")) return ["ux", "behavioral"];
+  return ["behavioral", "pm"];
+}
+
+const SEEN_KEY = "hiremate.seenQuestions";
+function getSeen(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(SEEN_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+function markSeen(q: string) {
+  if (typeof window === "undefined") return;
+  const all = getSeen();
+  all.push(q);
+  // keep last 60 to allow eventual recycling
+  localStorage.setItem(SEEN_KEY, JSON.stringify(all.slice(-60)));
+}
 
 export function generateQuestion(
   role: string,
   difficulty: "easy" | "medium" | "hard",
   asked: string[],
 ): { question: string; difficulty: "easy" | "medium" | "hard" } {
-  const r = role.toLowerCase();
-  const buckets: string[] = [];
-  if (r.includes("engineer") || r.includes("developer") || r.includes("swe")) {
-    buckets.push("technical", "system", "behavioral");
-  } else if (r.includes("product")) {
-    buckets.push("product", "behavioral");
-  } else {
-    buckets.push("behavioral", "product");
+  const buckets = bucketsForRole(role);
+  const pool = buckets.flatMap((b) => BANKS[b]?.[difficulty] ?? []);
+  const seen = new Set([...asked, ...getSeen()]);
+  let fresh = pool.filter((q) => !seen.has(q));
+  // Fallback: try other difficulties from the same buckets before recycling
+  if (!fresh.length) {
+    const wider = buckets.flatMap((b) => [
+      ...(BANKS[b]?.easy ?? []),
+      ...(BANKS[b]?.medium ?? []),
+      ...(BANKS[b]?.hard ?? []),
+    ]);
+    fresh = wider.filter((q) => !seen.has(q));
   }
-  const pool = buckets.flatMap((b) => BANK[b] ?? []);
-  const fresh = pool.filter((q) => !asked.includes(q));
   const list = fresh.length ? fresh : pool;
   const question = list[Math.floor(Math.random() * list.length)];
+  markSeen(question);
   return { question, difficulty };
 }
 
