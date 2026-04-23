@@ -29,7 +29,23 @@ const TOTAL = 5;
 type Turn =
   | { kind: "ai-question"; text: string; difficulty: "easy" | "medium" | "hard" }
   | { kind: "user-answer"; text: string }
-  | { kind: "ai-feedback"; qa: QA };
+  | { kind: "ai-feedback"; qa: QA }
+  | { kind: "ai-ack"; text: string };
+
+const ACKS = [
+  "Got it ✅ Let's keep going.",
+  "Nice detail 👍 Here's the next one.",
+  "Good answer. Moving on.",
+  "Noted ✅ Next question coming up.",
+  "Solid response. Let's continue.",
+  "Love that — onto the next.",
+  "Heard you. Next up…",
+];
+
+function pickAck(prev?: string): string {
+  const pool = ACKS.filter((a) => a !== prev);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 function Interview() {
   const navigate = useNavigate();
