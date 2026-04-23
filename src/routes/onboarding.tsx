@@ -2,13 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useEffect, useRef, useState } from "react";
 import { saveProfile, type Company, type Level, type Profile } from "@/lib/hiremate";
-import { ArrowRight, Paperclip, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
       { title: "Set up your interview — HireMate" },
-      { name: "description", content: "Pick your role, level, and target company. We'll tailor the questions." },
+      { name: "description", content: "A quick chat to tailor your mock interview — role, experience, and target company." },
       { property: "og:title", content: "Set up your interview — HireMate" },
       { property: "og:description", content: "A few quick taps and we'll tailor your mock interview." },
     ],
@@ -16,8 +16,13 @@ export const Route = createFileRoute("/onboarding")({
   component: Onboarding,
 });
 
-type Step = "role" | "roleOther" | "level" | "company" | "focus" | "resume" | "ready";
-type Bubble = { from: "ai" | "user"; text: string };
+// ---------- types ----------
+type StepId = "role" | "roleOther" | "level" | "company" | "ready" | "done";
+
+type Bubble =
+  | { kind: "ai"; text: string }
+  | { kind: "user"; text: string }
+  | { kind: "typing" };
 
 const ROLE_OPTIONS = [
   "Product Manager",
@@ -36,110 +41,177 @@ const LEVEL_OPTIONS: { label: string; value: Level }[] = [
 ];
 
 const COMPANY_OPTIONS: { label: string; value: Company }[] = [
-  { label: "Big Tech (Google, Amazon, Microsoft)", value: "Big Tech" },
+  { label: "Google", value: "Big Tech" },
+  { label: "Amazon", value: "Big Tech" },
+  { label: "Microsoft", value: "Big Tech" },
+  { label: "Flipkart", value: "Big Tech" },
   { label: "Startup", value: "Startup" },
-  { label: "Consulting", value: "Consulting" },
   { label: "General practice", value: "General" },
 ];
 
-const FOCUS_OPTIONS = ["Behavioral", "Technical", "System design", "Product sense", "Leadership"];
+const TYPING_MS = 1000;
+const STEP_GAP_MS = 350;
 
 function Onboarding() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>("role");
-  const [bubbles, setBubbles] = useState<Bubble[]>([
-    { from: "ai", text: "Hey — I'm HireMate 👋 I'll run your mock interview in a sec. First, what role are you preparing for?" },
-  ]);
+  const [step, setStep] = useState<StepId>("role");
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [role, setRole] = useState("");
   const [level, setLevel] = useState<Level | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
-  const [focus, setFocus] = useState<string[]>([]);
-  const [resumeName, setResumeName] = useState<string | undefined>();
   const [otherInput, setOtherInput] = useState("");
+  const [skippedAll, setSkippedAll] = useState(false);
+  const [allSkipped, setAllSkipped] = useState({ role: false, level: false, company: false });
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Bootstrap initial AI welcome (typing → message)
+  useEffect(() => {
+    setBubbles([{ kind: "typing" }]);
+    const t = setTimeout(() => {
+      setBubbles([
+        {
+          kind: "ai",
+          text:
+            "Hey 👋 I'm HireMate. Let's practice your next interview together.\n\nI'll ask real questions and help you improve your answers.\n\nWhat role are you preparing for?",
+        },
+      ]);
+    }, TYPING_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [bubbles, step]);
 
-  const pushAi = (text: string) => setBubbles((b) => [...b, { from: "ai", text }]);
-  const pushUser = (text: string) => setBubbles((b) => [...b, { from: "user", text }]);
+  // ---------- chat helpers ----------
+  const sayUser = (text: string) =>
+    setBubbles((b) => [...b, { kind: "user", text }]);
 
+  const sayAi = (text: string, after?: () => void) => {
+    setBubbles((b) => [...b, { kind: "typing" }]);
+    setTimeout(() => {
+      setBubbles((b) => {
+        const copy = [...b];
+        // replace last typing with ai message
+        for (let i = copy.length - 1; i >= 0; i--) {
+          if (copy[i].kind === "typing") {
+            copy[i] = { kind: "ai", text };
+            break;
+          }
+        }
+        return copy;
+      });
+      after?.();
+    }, TYPING_MS);
+  };
+
+  // ---------- step handlers ----------
   const pickRole = (r: string) => {
     if (r === "Other") {
       setStep("roleOther");
       return;
     }
     setRole(r);
-    pushUser(r);
+    sayUser(r);
+    setStep("done"); // hide chips immediately
     setTimeout(() => {
-      pushAi(`Great — ${r}. What's your experience level?`);
-      setStep("level");
-    }, 350);
+      sayAi(
+        `Great choice. ${r} interviews can be tricky — but that's exactly what I'm built for. 💪\n\nHow much experience do you have?`,
+        () => setStep("level"),
+      );
+    }, STEP_GAP_MS);
   };
 
   const submitOther = () => {
     const v = otherInput.trim();
     if (!v) return;
     setRole(v);
-    pushUser(v);
+    sayUser(v);
     setOtherInput("");
+    setStep("done");
     setTimeout(() => {
-      pushAi(`Got it — ${v}. What's your experience level?`);
-      setStep("level");
-    }, 350);
+      sayAi(
+        `Great choice. ${v} interviews can be tricky — but that's exactly what I'm built for. 💪\n\nHow much experience do you have?`,
+        () => setStep("level"),
+      );
+    }, STEP_GAP_MS);
   };
 
   const pickLevel = (opt: { label: string; value: Level }) => {
     setLevel(opt.value);
-    pushUser(opt.label);
+    sayUser(opt.label);
+    setStep("done");
     setTimeout(() => {
-      pushAi("Nice. What type of company are you targeting?");
-      setStep("company");
-    }, 300);
+      sayAi(
+        "Got it. I'll calibrate the questions to your level.\n\nOne more thing — any specific company you're targeting, or just general practice?",
+        () => setStep("company"),
+      );
+    }, STEP_GAP_MS);
   };
 
   const pickCompany = (opt: { label: string; value: Company }) => {
     setCompany(opt.value);
-    pushUser(opt.label);
-    setTimeout(() => {
-      pushAi("Last bit — which areas should I lean into? Pick as many as you like.");
-      setStep("focus");
-    }, 300);
+    sayUser(opt.label);
+    setStep("done");
+    setTimeout(() => goReady(false), STEP_GAP_MS);
   };
 
-  const toggleFocus = (f: string) =>
-    setFocus((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]));
-
-  const confirmFocus = () => {
-    if (!focus.length) return;
-    pushUser(focus.join(" • "));
+  // ---------- skip handlers ----------
+  const skipRole = () => {
+    sayUser("Skip — general interview");
+    setAllSkipped((s) => ({ ...s, role: true }));
+    setSkippedAll(true);
+    setStep("done");
     setTimeout(() => {
-      pushAi("Optional: drop your resume so I can tailor questions to your experience. Or skip — totally fine.");
-      setStep("resume");
-    }, 300);
+      sayAi(
+        "No problem 👍 I'll run a general interview covering common behavioral and situational questions. Let's go!",
+        () => goReady(true),
+      );
+    }, STEP_GAP_MS);
   };
 
-  const handleResume = (name?: string) => {
-    if (name) {
-      setResumeName(name);
-      pushUser(`📎 ${name}`);
-    } else {
-      pushUser("Skip for now");
-    }
+  const skipLevel = () => {
+    sayUser("Skip — any level");
+    setAllSkipped((s) => ({ ...s, level: true }));
+    setStep("done");
     setTimeout(() => {
-      pushAi("Perfect. I'll start easy and ramp up based on how you answer. Ready?");
-      setStep("ready");
-    }, 350);
+      sayAi("Got it 👍 I'll mix in questions suitable for all experience levels.", () => {
+        setTimeout(() => {
+          sayAi(
+            "One more thing — any specific company you're targeting, or just general practice?",
+            () => setStep("company"),
+          );
+        }, STEP_GAP_MS);
+      });
+    }, STEP_GAP_MS);
+  };
+
+  const skipCompany = () => {
+    sayUser("Skip — general practice");
+    setAllSkipped((s) => ({ ...s, company: true }));
+    setStep("done");
+    setTimeout(() => {
+      sayAi("No worries 👍 I'll use a well-rounded question set that works across companies.", () =>
+        goReady(false),
+      );
+    }, STEP_GAP_MS);
+  };
+
+  const goReady = (fullSkip: boolean) => {
+    const text = fullSkip
+      ? "All good 👍 I'll run a general mock interview — a mix of behavioral and situational questions suitable for any role and experience level.\n\n• 5–6 real interview questions\n• Follow-ups based on your answers\n• A detailed scorecard at the end\n\nReady when you are."
+      : "All set ✅ Here's what's coming:\n\n• 5–6 real interview questions\n• Follow-ups based on your answers\n• A detailed scorecard at the end\n\nTake your time with each answer. No rush. Ready?";
+    setTimeout(() => {
+      sayAi(text, () => setStep("ready"));
+    }, STEP_GAP_MS);
   };
 
   const begin = () => {
     const profile: Profile = {
-      role,
-      level: level!,
-      focus,
-      company: company ?? undefined,
-      resumeName,
+      role: role || "General candidate",
+      level: level ?? "Mid",
+      focus: ["Behavioral", "Situational"],
+      company: company ?? "General",
     };
     saveProfile(profile);
     navigate({ to: "/interview" });
@@ -158,14 +230,15 @@ function Onboarding() {
           ref={scrollRef}
           className="flex-1 overflow-y-auto rounded-3xl border border-border/70 bg-card p-5 sm:p-6 space-y-4"
         >
-          {bubbles.map((b, i) => (
-            <Bubble key={i} from={b.from}>
-              {b.text}
-            </Bubble>
-          ))}
+          {bubbles.map((b, i) => {
+            if (b.kind === "typing") return <TypingBubble key={i} />;
+            if (b.kind === "ai") return <AiBubble key={i} text={b.text} />;
+            return <UserBubble key={i} text={b.text} />;
+          })}
 
+          {/* STEP: role chips */}
           {step === "role" && (
-            <div className="pl-11">
+            <StepBlock>
               <ChipGrid>
                 {ROLE_OPTIONS.map((r) => (
                   <Chip key={r} onClick={() => pickRole(r)}>
@@ -173,11 +246,18 @@ function Onboarding() {
                   </Chip>
                 ))}
               </ChipGrid>
-            </div>
+              <SkipLink
+                onClick={skipRole}
+                tooltip="We'll run a general interview covering common questions"
+              >
+                Skip — surprise me with a general interview
+              </SkipLink>
+            </StepBlock>
           )}
 
+          {/* STEP: role "Other" input */}
           {step === "roleOther" && (
-            <div className="pl-11">
+            <StepBlock>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -189,22 +269,24 @@ function Onboarding() {
                   autoFocus
                   value={otherInput}
                   onChange={(e) => setOtherInput(e.target.value)}
-                  placeholder="Type your role…"
+                  placeholder="Type your role (e.g. DevOps Engineer at a startup)"
                   className="flex-1 rounded-full border border-border bg-background px-5 py-3 text-sm outline-none focus:border-coral transition"
                 />
                 <button
                   type="submit"
                   disabled={!otherInput.trim()}
                   className="rounded-full bg-foreground text-background px-5 py-3 text-sm font-medium disabled:opacity-40 transition"
+                  aria-label="Submit role"
                 >
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </form>
-            </div>
+            </StepBlock>
           )}
 
+          {/* STEP: level chips */}
           {step === "level" && (
-            <div className="pl-11">
+            <StepBlock>
               <ChipGrid>
                 {LEVEL_OPTIONS.map((opt) => (
                   <Chip key={opt.label} onClick={() => pickLevel(opt)}>
@@ -212,11 +294,18 @@ function Onboarding() {
                   </Chip>
                 ))}
               </ChipGrid>
-            </div>
+              <SkipLink
+                onClick={skipLevel}
+                tooltip="Questions will be a mix of easy and challenging"
+              >
+                Skip — keep it balanced for all levels
+              </SkipLink>
+            </StepBlock>
           )}
 
+          {/* STEP: company chips */}
           {step === "company" && (
-            <div className="pl-11">
+            <StepBlock>
               <ChipGrid>
                 {COMPANY_OPTIONS.map((opt) => (
                   <Chip key={opt.label} onClick={() => pickCompany(opt)}>
@@ -224,114 +313,138 @@ function Onboarding() {
                   </Chip>
                 ))}
               </ChipGrid>
-            </div>
-          )}
-
-          {step === "focus" && (
-            <div className="pl-11 space-y-3">
-              <ChipGrid>
-                {FOCUS_OPTIONS.map((f) => {
-                  const active = focus.includes(f);
-                  return (
-                    <Chip key={f} active={active} onClick={() => toggleFocus(f)}>
-                      {active && <Check className="h-3.5 w-3.5" />}
-                      {f}
-                    </Chip>
-                  );
-                })}
-              </ChipGrid>
-              <button
-                onClick={confirmFocus}
-                disabled={!focus.length}
-                className="text-sm text-coral font-medium disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1"
+              <SkipLink
+                onClick={skipCompany}
+                tooltip="Questions won't be tailored to any specific company"
               >
-                Continue <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+                Skip — no specific company in mind
+              </SkipLink>
+            </StepBlock>
           )}
 
-          {step === "resume" && (
-            <div className="pl-11 flex flex-wrap items-center gap-2">
-              <label className="cursor-pointer rounded-full border border-coral/30 bg-peach hover:bg-coral-soft hover:border-coral transition px-4 py-2 text-sm inline-flex items-center gap-2">
-                <Paperclip className="h-3.5 w-3.5" />
-                Upload resume
-                <input
-                  type="file"
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.txt"
-                  onChange={(e) => handleResume(e.target.files?.[0]?.name)}
-                />
-              </label>
-              <button
-                onClick={() => handleResume()}
-                className="rounded-full border border-border bg-background hover:bg-secondary px-4 py-2 text-sm"
-              >
-                Skip for now
-              </button>
-            </div>
-          )}
-
+          {/* STEP: ready */}
           {step === "ready" && (
-            <div className="pl-11">
-              <button
-                onClick={begin}
-                className="inline-flex items-center gap-2 rounded-full bg-foreground text-background px-5 py-3 text-sm font-medium hover:opacity-90 transition shadow-warm"
-              >
-                Begin interview <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
+            <StepBlock>
+              <div className="pl-11 space-y-3">
+                <button
+                  onClick={begin}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-foreground text-background px-5 py-3.5 text-sm font-medium hover:opacity-90 active:scale-[0.99] transition shadow-warm"
+                >
+                  Let's go <ArrowRight className="h-4 w-4" />
+                </button>
+                <div className="text-center">
+                  <button
+                    onClick={() => navigate({ to: "/scorecard", search: { id: "sample" } })}
+                    className="text-[13px] text-muted-foreground hover:text-foreground underline underline-offset-4 inline-flex items-center gap-1 py-3 px-2 min-h-[44px]"
+                  >
+                    Not ready yet — show me a sample scorecard first →
+                  </button>
+                </div>
+              </div>
+            </StepBlock>
           )}
         </div>
+        {/* Tiny hint (avoids unused-state warning + gives flow context) */}
+        {skippedAll && allSkipped.role && step === "ready" && (
+          <p className="mt-3 text-[11px] text-center text-muted-foreground">
+            General interview mode — no preferences saved.
+          </p>
+        )}
       </main>
     </div>
   );
 }
 
-function ChipGrid({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap gap-2">{children}</div>;
+// ---------- presentational pieces ----------
+
+function StepBlock({ children }: { children: React.ReactNode }) {
+  return <div className="animate-fade-in">{children}</div>;
 }
 
-function Chip({
-  children,
-  onClick,
-  active = false,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  active?: boolean;
-}) {
+function ChipGrid({ children }: { children: React.ReactNode }) {
+  return <div className="pl-11 grid grid-cols-2 sm:flex sm:flex-wrap gap-2">{children}</div>;
+}
+
+function Chip({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-full border px-4 py-2 text-sm transition inline-flex items-center gap-1.5 ${
-        active
-          ? "bg-foreground text-background border-foreground shadow-warm"
-          : "bg-peach border-coral/20 text-ink hover:bg-coral-soft hover:border-coral"
-      }`}
+      className="min-h-[44px] rounded-full border border-coral/20 bg-peach text-ink hover:bg-coral-soft hover:border-coral active:scale-[0.97] focus:bg-foreground focus:text-background focus:border-foreground transition px-4 py-2.5 text-sm text-left"
     >
       {children}
     </button>
   );
 }
 
-function Bubble({ from, children }: { from: "ai" | "user"; children: React.ReactNode }) {
-  if (from === "ai") {
-    return (
-      <div className="flex items-start gap-3">
-        <div className="h-8 w-8 shrink-0 rounded-full gradient-warm flex items-center justify-center text-xs font-display font-semibold text-ink">
-          H
-        </div>
-        <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed">
-          {children}
-        </div>
-      </div>
-    );
-  }
+function SkipLink({
+  children,
+  onClick,
+  tooltip,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  tooltip: string;
+}) {
   return (
-    <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-foreground text-background px-4 py-2.5 text-sm leading-relaxed">
-        {children}
+    <div className="pl-11 mt-3 flex justify-center">
+      <button
+        onClick={onClick}
+        title={tooltip}
+        aria-label={`${children} — ${tooltip}`}
+        className="group relative min-h-[44px] px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground underline underline-offset-4 decoration-muted-foreground/40 hover:decoration-foreground transition inline-flex items-center gap-1"
+      >
+        {children} <span aria-hidden>→</span>
+        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground text-background text-[11px] px-2.5 py-1.5 opacity-0 group-hover:opacity-100 transition shadow-warm hidden sm:block">
+          {tooltip}
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function AiBubble({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-3 animate-fade-in">
+      <div className="h-8 w-8 shrink-0 rounded-full gradient-warm flex items-center justify-center text-xs font-display font-semibold text-ink">
+        H
+      </div>
+      <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-secondary px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line">
+        {text}
       </div>
     </div>
+  );
+}
+
+function UserBubble({ text }: { text: string }) {
+  return (
+    <div className="flex justify-end animate-fade-in">
+      <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-foreground text-background px-4 py-2.5 text-sm leading-relaxed">
+        {text}
+      </div>
+    </div>
+  );
+}
+
+function TypingBubble() {
+  return (
+    <div className="flex items-start gap-3 animate-fade-in">
+      <div className="h-8 w-8 shrink-0 rounded-full gradient-warm flex items-center justify-center text-xs font-display font-semibold text-ink">
+        H
+      </div>
+      <div className="rounded-2xl rounded-tl-md bg-secondary px-4 py-3 inline-flex items-center gap-1">
+        <Dot delay="0ms" />
+        <Dot delay="150ms" />
+        <Dot delay="300ms" />
+      </div>
+    </div>
+  );
+}
+
+function Dot({ delay }: { delay: string }) {
+  return (
+    <span
+      className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
+      style={{ animationDelay: delay, animationDuration: "1s" }}
+    />
   );
 }
