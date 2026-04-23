@@ -167,15 +167,7 @@ function Interview() {
     transcribeTimerRef.current = setTimeout(tick, 350);
   };
 
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (recTimerRef.current) clearInterval(recTimerRef.current);
-      if (transcribeTimerRef.current) clearTimeout(transcribeTimerRef.current);
-    };
-  }, []);
-
-
+  const redo = (qaId: string) => {
     // Find the answer that produced this feedback and restore it for editing
     const feedbackIdx = turns.findIndex((t) => t.kind === "ai-feedback" && t.qa.id === qaId);
     if (feedbackIdx === -1) return;
