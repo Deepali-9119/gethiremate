@@ -85,6 +85,14 @@ function Interview() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, thinking]);
 
+  // Cleanup voice timers on unmount
+  useEffect(() => {
+    return () => {
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      if (transcribeTimerRef.current) clearTimeout(transcribeTimerRef.current);
+    };
+  }, []);
+
   if (!profile) return null;
 
   const currentQ = [...turns].reverse().find((t) => t.kind === "ai-question") as
