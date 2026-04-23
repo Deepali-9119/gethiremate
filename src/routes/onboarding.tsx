@@ -1,23 +1,46 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useEffect, useRef, useState } from "react";
-import { saveProfile, type Level, type Profile } from "@/lib/hiremate";
+import { saveProfile, type Company, type Level, type Profile } from "@/lib/hiremate";
 import { ArrowRight, Paperclip, Check } from "lucide-react";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
       { title: "Set up your interview — HireMate" },
-      { name: "description", content: "Tell HireMate the role, level, and focus areas. Optional resume upload for sharper questions." },
+      { name: "description", content: "Pick your role, level, and target company. We'll tailor the questions." },
       { property: "og:title", content: "Set up your interview — HireMate" },
-      { property: "og:description", content: "Three quick questions and we'll tailor your mock interview." },
+      { property: "og:description", content: "A few quick taps and we'll tailor your mock interview." },
     ],
   }),
   component: Onboarding,
 });
 
-type Step = "role" | "level" | "focus" | "resume" | "ready";
+type Step = "role" | "roleOther" | "level" | "company" | "focus" | "resume" | "ready";
 type Bubble = { from: "ai" | "user"; text: string };
+
+const ROLE_OPTIONS = [
+  "Product Manager",
+  "Software Engineer",
+  "Data Analyst",
+  "Business Analyst",
+  "UX Designer",
+  "Other",
+];
+
+const LEVEL_OPTIONS: { label: string; value: Level }[] = [
+  { label: "Fresher / Student", value: "Junior" },
+  { label: "1–3 years", value: "Junior" },
+  { label: "3–5 years", value: "Mid" },
+  { label: "5+ years", value: "Senior" },
+];
+
+const COMPANY_OPTIONS: { label: string; value: Company }[] = [
+  { label: "Big Tech (Google, Amazon, Microsoft)", value: "Big Tech" },
+  { label: "Startup", value: "Startup" },
+  { label: "Consulting", value: "Consulting" },
+  { label: "General practice", value: "General" },
+];
 
 const FOCUS_OPTIONS = ["Behavioral", "Technical", "System design", "Product sense", "Leadership"];
 
@@ -29,9 +52,10 @@ function Onboarding() {
   ]);
   const [role, setRole] = useState("");
   const [level, setLevel] = useState<Level | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [focus, setFocus] = useState<string[]>([]);
   const [resumeName, setResumeName] = useState<string | undefined>();
-  const [input, setInput] = useState("");
+  const [otherInput, setOtherInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,23 +65,45 @@ function Onboarding() {
   const pushAi = (text: string) => setBubbles((b) => [...b, { from: "ai", text }]);
   const pushUser = (text: string) => setBubbles((b) => [...b, { from: "user", text }]);
 
-  const submitRole = () => {
-    const v = input.trim();
-    if (!v) return;
-    setRole(v);
-    pushUser(v);
-    setInput("");
+  const pickRole = (r: string) => {
+    if (r === "Other") {
+      setStep("roleOther");
+      return;
+    }
+    setRole(r);
+    pushUser(r);
     setTimeout(() => {
-      pushAi(`Got it — ${v}. And how would you describe your experience level?`);
+      pushAi(`Great — ${r}. What's your experience level?`);
       setStep("level");
     }, 350);
   };
 
-  const pickLevel = (lv: Level) => {
-    setLevel(lv);
-    pushUser(lv);
+  const submitOther = () => {
+    const v = otherInput.trim();
+    if (!v) return;
+    setRole(v);
+    pushUser(v);
+    setOtherInput("");
     setTimeout(() => {
-      pushAi("Nice. Which areas should I lean into? Pick as many as you like.");
+      pushAi(`Got it — ${v}. What's your experience level?`);
+      setStep("level");
+    }, 350);
+  };
+
+  const pickLevel = (opt: { label: string; value: Level }) => {
+    setLevel(opt.value);
+    pushUser(opt.label);
+    setTimeout(() => {
+      pushAi("Nice. What type of company are you targeting?");
+      setStep("company");
+    }, 300);
+  };
+
+  const pickCompany = (opt: { label: string; value: Company }) => {
+    setCompany(opt.value);
+    pushUser(opt.label);
+    setTimeout(() => {
+      pushAi("Last bit — which areas should I lean into? Pick as many as you like.");
       setStep("focus");
     }, 300);
   };
@@ -92,6 +138,7 @@ function Onboarding() {
       role,
       level: level!,
       focus,
+      company: company ?? undefined,
       resumeName,
     };
     saveProfile(profile);
@@ -117,41 +164,82 @@ function Onboarding() {
             </Bubble>
           ))}
 
-          {step === "level" && (
-            <div className="flex flex-wrap gap-2 pl-11">
-              {(["Junior", "Mid", "Senior"] as Level[]).map((lv) => (
+          {step === "role" && (
+            <div className="pl-11">
+              <ChipGrid>
+                {ROLE_OPTIONS.map((r) => (
+                  <Chip key={r} onClick={() => pickRole(r)}>
+                    {r}
+                  </Chip>
+                ))}
+              </ChipGrid>
+            </div>
+          )}
+
+          {step === "roleOther" && (
+            <div className="pl-11">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submitOther();
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  autoFocus
+                  value={otherInput}
+                  onChange={(e) => setOtherInput(e.target.value)}
+                  placeholder="Type your role…"
+                  className="flex-1 rounded-full border border-border bg-background px-5 py-3 text-sm outline-none focus:border-coral transition"
+                />
                 <button
-                  key={lv}
-                  onClick={() => pickLevel(lv)}
-                  className="rounded-full border border-border bg-background hover:bg-coral-soft hover:border-coral transition px-4 py-2 text-sm"
+                  type="submit"
+                  disabled={!otherInput.trim()}
+                  className="rounded-full bg-foreground text-background px-5 py-3 text-sm font-medium disabled:opacity-40 transition"
                 >
-                  {lv}
+                  <ArrowRight className="h-4 w-4" />
                 </button>
-              ))}
+              </form>
+            </div>
+          )}
+
+          {step === "level" && (
+            <div className="pl-11">
+              <ChipGrid>
+                {LEVEL_OPTIONS.map((opt) => (
+                  <Chip key={opt.label} onClick={() => pickLevel(opt)}>
+                    {opt.label}
+                  </Chip>
+                ))}
+              </ChipGrid>
+            </div>
+          )}
+
+          {step === "company" && (
+            <div className="pl-11">
+              <ChipGrid>
+                {COMPANY_OPTIONS.map((opt) => (
+                  <Chip key={opt.label} onClick={() => pickCompany(opt)}>
+                    {opt.label}
+                  </Chip>
+                ))}
+              </ChipGrid>
             </div>
           )}
 
           {step === "focus" && (
             <div className="pl-11 space-y-3">
-              <div className="flex flex-wrap gap-2">
+              <ChipGrid>
                 {FOCUS_OPTIONS.map((f) => {
                   const active = focus.includes(f);
                   return (
-                    <button
-                      key={f}
-                      onClick={() => toggleFocus(f)}
-                      className={`rounded-full border px-4 py-2 text-sm transition flex items-center gap-1.5 ${
-                        active
-                          ? "bg-foreground text-background border-foreground"
-                          : "bg-background border-border hover:border-coral"
-                      }`}
-                    >
+                    <Chip key={f} active={active} onClick={() => toggleFocus(f)}>
                       {active && <Check className="h-3.5 w-3.5" />}
                       {f}
-                    </button>
+                    </Chip>
                   );
                 })}
-              </div>
+              </ChipGrid>
               <button
                 onClick={confirmFocus}
                 disabled={!focus.length}
@@ -164,7 +252,7 @@ function Onboarding() {
 
           {step === "resume" && (
             <div className="pl-11 flex flex-wrap items-center gap-2">
-              <label className="cursor-pointer rounded-full border border-border bg-background hover:bg-coral-soft hover:border-coral transition px-4 py-2 text-sm inline-flex items-center gap-2">
+              <label className="cursor-pointer rounded-full border border-coral/30 bg-peach hover:bg-coral-soft hover:border-coral transition px-4 py-2 text-sm inline-flex items-center gap-2">
                 <Paperclip className="h-3.5 w-3.5" />
                 Upload resume
                 <input
@@ -194,33 +282,35 @@ function Onboarding() {
             </div>
           )}
         </div>
-
-        {step === "role" && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              submitRole();
-            }}
-            className="mt-4 flex gap-2"
-          >
-            <input
-              autoFocus
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="e.g. Senior Frontend Engineer at a fintech"
-              className="flex-1 rounded-full border border-border bg-card px-5 py-3.5 text-sm outline-none focus:border-coral transition"
-            />
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="rounded-full bg-foreground text-background px-5 py-3.5 text-sm font-medium disabled:opacity-40 transition"
-            >
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </form>
-        )}
       </main>
     </div>
+  );
+}
+
+function ChipGrid({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-wrap gap-2">{children}</div>;
+}
+
+function Chip({
+  children,
+  onClick,
+  active = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full border px-4 py-2 text-sm transition inline-flex items-center gap-1.5 ${
+        active
+          ? "bg-foreground text-background border-foreground shadow-warm"
+          : "bg-peach border-coral/20 text-ink hover:bg-coral-soft hover:border-coral"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
