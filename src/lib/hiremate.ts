@@ -1,10 +1,12 @@
 // HireMate prototype data + helpers (mocked AI, localStorage persistence)
 
 export type Level = "Junior" | "Mid" | "Senior";
+export type Company = "Big Tech" | "Startup" | "Consulting" | "General";
 export type Profile = {
   role: string;
   level: Level;
   focus: string[];
+  company?: Company;
   resumeName?: string;
 };
 
