@@ -199,11 +199,24 @@ function Interview() {
                 </div>
               );
             }
+            if (t.kind === "ai-ack") {
+              return (
+                <div key={i} className="flex items-start gap-3">
+                  <Avatar />
+                  <div className="max-w-[80%] rounded-2xl rounded-tl-md bg-secondary/60 px-4 py-2 text-sm leading-relaxed text-muted-foreground italic">
+                    {t.text}
+                  </div>
+                </div>
+              );
+            }
             // feedback card
             const m = t.qa.metrics;
+            const last = turns[turns.length - 1]?.kind;
+            const secondLast = turns[turns.length - 2]?.kind;
             const isLatestFeedback =
               i === turns.length - 1 ||
-              (i === turns.length - 2 && turns[turns.length - 1]?.kind === "ai-question");
+              (i === turns.length - 2 && (last === "ai-question" || last === "ai-ack")) ||
+              (i === turns.length - 3 && last === "ai-question" && secondLast === "ai-ack");
             return (
               <div key={i} className="flex items-start gap-3">
                 <Avatar />
