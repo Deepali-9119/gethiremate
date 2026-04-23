@@ -62,6 +62,11 @@ function Interview() {
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [done, setDone] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const transcribeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
