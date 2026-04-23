@@ -12,7 +12,14 @@ import {
   type QA,
 } from "@/lib/hiremate";
 import { MetricBar } from "@/components/MetricBar";
-import { ArrowRight, Send, Sparkles, Flag, RotateCcw } from "lucide-react";
+import { ArrowRight, Send, Sparkles, Flag, RotateCcw, Mic, Square } from "lucide-react";
+
+const SAMPLE_TRANSCRIPTS = [
+  "So, in my last role I led the redesign of our onboarding flow. The drop-off was around 38% on step two, so I partnered with design and analytics to run a quick research sprint, then shipped a simplified two-step version. Activation jumped 22% in the first month, and we kept the lift through the next quarter.",
+  "I'd start by clarifying the goal — are we optimizing for engagement, retention, or revenue. Then I'd map the user journey and find the highest-friction step. Once I had a hypothesis, I'd run a small A/B test, watch the leading indicators for two weeks, and only roll out broadly if the metric moved by at least 5%.",
+  "Honestly, the proudest moment was shipping our payments rewrite. We had three weeks, two engineers, and a strict reliability target. I cut scope on the lowest-impact piece, paired daily with the team, and we landed on time with zero production incidents in the first month.",
+  "I think the biggest lesson was learning to push back earlier. I used to absorb scope without questioning it, and that hurt the team. Now I ask two questions up front: what's the success metric, and what are we explicitly not doing. It's saved us weeks more than once.",
+];
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
