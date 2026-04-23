@@ -134,7 +134,48 @@ function Interview() {
     }, 900);
   };
 
-  const redo = (qaId: string) => {
+  const startRecording = () => {
+    if (recording || transcribing || thinking) return;
+    setRecording(true);
+    setRecSeconds(0);
+    recTimerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
+  };
+
+  const stopRecording = () => {
+    if (!recording) return;
+    setRecording(false);
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+    recTimerRef.current = null;
+    setTranscribing(true);
+    // Simulate transcription stream into the input
+    const sample = SAMPLE_TRANSCRIPTS[Math.floor(Math.random() * SAMPLE_TRANSCRIPTS.length)];
+    const words = sample.split(" ");
+    let i = 0;
+    setInput("");
+    const tick = () => {
+      i += 1;
+      setInput(words.slice(0, i).join(" "));
+      if (i < words.length) {
+        transcribeTimerRef.current = setTimeout(tick, 35);
+      } else {
+        transcribeTimerRef.current = setTimeout(() => {
+          setTranscribing(false);
+          submit(sample);
+        }, 450);
+      }
+    };
+    transcribeTimerRef.current = setTimeout(tick, 350);
+  };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      if (transcribeTimerRef.current) clearTimeout(transcribeTimerRef.current);
+    };
+  }, []);
+
+
     // Find the answer that produced this feedback and restore it for editing
     const feedbackIdx = turns.findIndex((t) => t.kind === "ai-feedback" && t.qa.id === qaId);
     if (feedbackIdx === -1) return;
