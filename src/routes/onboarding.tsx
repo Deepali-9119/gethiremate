@@ -334,7 +334,7 @@ function Onboarding() {
                 </button>
                 <div className="text-center">
                   <button
-                    onClick={() => navigate({ to: "/scorecard" })}
+                    onClick={() => navigate({ to: "/scorecard", search: { id: "sample" } })}
                     className="text-[13px] text-muted-foreground hover:text-foreground underline underline-offset-4 inline-flex items-center gap-1 py-3 px-2 min-h-[44px]"
                   >
                     Not ready yet — show me a sample scorecard first →
