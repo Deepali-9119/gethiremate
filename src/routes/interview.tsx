@@ -389,30 +389,60 @@ function Interview() {
         {/* Composer */}
         {!done && (
           <div className="mt-4">
-            <div className="flex items-end gap-2 rounded-3xl border border-border/70 bg-card p-2 focus-within:border-coral transition">
-              <textarea
-                ref={taRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    submit();
-                  }
-                }}
-                rows={2}
-                placeholder="Take your time. Speak like you'd speak to a real interviewer…"
-                className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
-              />
-              <button
-                onClick={submit}
-                disabled={!input.trim() || thinking}
-                className="rounded-2xl bg-foreground text-background h-11 w-11 flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition"
-                aria-label="Send"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+            {/* Voice mode hint */}
+            <div className="mb-2 px-2 flex items-center justify-between text-xs">
+              <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                <span aria-hidden>🎙</span>
+                <span>
+                  Try voice mode — practice answering out loud like a real interview
+                </span>
+              </span>
             </div>
+
+            {recording || transcribing ? (
+              <RecordingPanel
+                recording={recording}
+                transcribing={transcribing}
+                seconds={recSeconds}
+                preview={input}
+                onStop={stopRecording}
+              />
+            ) : (
+              <div className="flex items-end gap-2 rounded-3xl border border-border/70 bg-card p-2 focus-within:border-coral transition">
+                <textarea
+                  ref={taRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      submit();
+                    }
+                  }}
+                  rows={2}
+                  placeholder="Type your answer, or tap the mic to speak…"
+                  className="flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+                />
+                <button
+                  onClick={startRecording}
+                  disabled={thinking}
+                  className="rounded-2xl border border-coral/30 bg-peach text-ink h-11 w-11 flex items-center justify-center disabled:opacity-30 hover:bg-coral-soft hover:border-coral transition"
+                  aria-label="Record voice answer"
+                  title="Speak your answer"
+                >
+                  <Mic className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => submit()}
+                  disabled={!input.trim() || thinking}
+                  className="rounded-2xl bg-foreground text-background h-11 w-11 flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition"
+                  aria-label="Send"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
             <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground px-2">
               <span>⌘ + Enter to send</span>
               {canEnd && (
