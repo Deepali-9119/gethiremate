@@ -29,7 +29,23 @@ const TOTAL = 5;
 type Turn =
   | { kind: "ai-question"; text: string; difficulty: "easy" | "medium" | "hard" }
   | { kind: "user-answer"; text: string }
-  | { kind: "ai-feedback"; qa: QA };
+  | { kind: "ai-feedback"; qa: QA }
+  | { kind: "ai-ack"; text: string };
+
+const ACKS = [
+  "Got it ✅ Let's keep going.",
+  "Nice detail 👍 Here's the next one.",
+  "Good answer. Moving on.",
+  "Noted ✅ Next question coming up.",
+  "Solid response. Let's continue.",
+  "Love that — onto the next.",
+  "Heard you. Next up…",
+];
+
+function pickAck(prev?: string): string {
+  const pool = ACKS.filter((a) => a !== prev);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 function Interview() {
   const navigate = useNavigate();
@@ -85,14 +101,24 @@ function Interview() {
         return;
       }
 
-      // Next adaptive question
+      // Brief acknowledgment, then next adaptive question
       setTimeout(() => {
-        const diff = nextDifficulty(qa.metrics);
-        const asked = turns.filter((t) => t.kind === "ai-question").map((t: any) => t.text);
-        const { question } = generateQuestion(profile.role, diff, [...asked, currentQ.text]);
-        setTurns((t) => [...t, { kind: "ai-question", text: question, difficulty: diff }]);
-        setThinking(false);
-      }, 600);
+        const lastAck = [...turns].reverse().find((tt) => tt.kind === "ai-ack") as
+          | { kind: "ai-ack"; text: string }
+          | undefined;
+        const ack = pickAck(lastAck?.text);
+        setTurns((t) => [...t, { kind: "ai-ack", text: ack }]);
+
+        setTimeout(() => {
+          const diff = nextDifficulty(qa.metrics);
+          const asked = turns
+            .filter((t) => t.kind === "ai-question")
+            .map((t) => (t as { kind: "ai-question"; text: string }).text);
+          const { question } = generateQuestion(profile.role, diff, [...asked, currentQ.text]);
+          setTurns((t) => [...t, { kind: "ai-question", text: question, difficulty: diff }]);
+          setThinking(false);
+        }, 1300);
+      }, 500);
     }, 900);
   };
 
@@ -183,11 +209,24 @@ function Interview() {
                 </div>
               );
             }
+            if (t.kind === "ai-ack") {
+              return (
+                <div key={i} className="flex items-start gap-3">
+                  <Avatar />
+                  <div className="max-w-[80%] rounded-2xl rounded-tl-md bg-secondary/60 px-4 py-2 text-sm leading-relaxed text-muted-foreground italic">
+                    {t.text}
+                  </div>
+                </div>
+              );
+            }
             // feedback card
             const m = t.qa.metrics;
+            const last = turns[turns.length - 1]?.kind;
+            const secondLast = turns[turns.length - 2]?.kind;
             const isLatestFeedback =
               i === turns.length - 1 ||
-              (i === turns.length - 2 && turns[turns.length - 1]?.kind === "ai-question");
+              (i === turns.length - 2 && (last === "ai-question" || last === "ai-ack")) ||
+              (i === turns.length - 3 && last === "ai-question" && secondLast === "ai-ack");
             return (
               <div key={i} className="flex items-start gap-3">
                 <Avatar />
