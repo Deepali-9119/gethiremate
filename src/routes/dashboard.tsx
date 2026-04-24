@@ -427,8 +427,10 @@ function EmptyState() {
       <div className="absolute inset-0 bg-grain opacity-40 pointer-events-none" />
       <div className="relative">
         <Sparkles className="h-7 w-7 text-coral mx-auto mb-3" />
-        <h2 className="font-display text-3xl font-semibold text-ink mb-2">No sessions yet.</h2>
-        <p className="text-ink/80 mb-6">Run your first mock interview — it takes about 10 minutes.</p>
+        <h2 className="font-display text-3xl font-semibold text-ink mb-2">
+          No interview sessions yet.
+        </h2>
+        <p className="text-ink/80 mb-6">Start your first mock interview — it takes about 10 minutes.</p>
         <Link
           to="/onboarding"
           className="inline-flex items-center gap-2 rounded-full bg-ink text-background px-6 py-3 text-sm font-medium hover:opacity-90 transition"
