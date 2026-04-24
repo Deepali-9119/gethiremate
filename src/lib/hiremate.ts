@@ -29,6 +29,7 @@ export type QA = {
   improvedAnswer: string;
   howToImprove: string[];
   missing: string[];
+  tooShort?: boolean;
 };
 
 export type Interview = {
