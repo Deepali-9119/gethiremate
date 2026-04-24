@@ -150,6 +150,19 @@ function Interview() {
       score,
     };
     saveInterview(interview);
+
+    // Also persist a simplified session entry under "hiremate_sessions"
+    const { strengths, improvements } = summarizeQAs(qas);
+    appendSession({
+      id: interview.id,
+      role: profile.role,
+      date: interview.date,
+      overall_score: score,
+      breakdown_scores: overall,
+      strengths,
+      improvements,
+    });
+
     navigate({ to: "/scorecard", search: { id: interview.id } });
   };
 
