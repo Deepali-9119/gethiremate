@@ -113,6 +113,16 @@ function Dashboard() {
               />
             </div>
 
+            {/* Progress snapshot — latest vs previous session */}
+            {latestSession && (
+              <ProgressSnapshot
+                latest={latestSession}
+                previous={previousSession}
+                delta={scoreDelta}
+                total={sessions.length}
+              />
+            )}
+
             {/* Score trend */}
             <section className="rounded-3xl bg-card border border-border/70 p-6 sm:p-8 mb-10">
               <div className="flex items-end justify-between flex-wrap gap-2 mb-5">
@@ -182,6 +192,9 @@ function Dashboard() {
 
             {/* Suggestion */}
             <SuggestionCard topWeak={topWeak} latestRole={history[0]?.role} />
+
+            {/* Session history (from hiremate_sessions) */}
+            {sessions.length > 0 && <SessionHistory sessions={sessions} />}
 
             {/* Bottom CTA */}
             <div className="mt-10 flex justify-center">
