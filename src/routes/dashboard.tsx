@@ -54,7 +54,7 @@ function Dashboard() {
         <div className="flex items-end justify-between flex-wrap gap-4 mb-8">
           <div>
             <h1 className="font-display text-4xl sm:text-5xl font-semibold leading-tight">
-              Welcome back <span className="inline-block">👋</span>
+              Welcome <span className="inline-block">👋</span>
             </h1>
             <p className="text-muted-foreground mt-1">
               Here's your interview prep progress
