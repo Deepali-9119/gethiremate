@@ -11,6 +11,7 @@ import {
   type Interview,
   type QA,
 } from "@/lib/hiremate";
+import { appendSession, summarizeQAs } from "@/lib/sessions";
 import { MetricBar } from "@/components/MetricBar";
 import { ArrowRight, Send, Sparkles, Flag, RotateCcw } from "lucide-react";
 
