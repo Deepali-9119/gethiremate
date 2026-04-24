@@ -29,11 +29,13 @@ export const Route = createFileRoute("/dashboard")({
 
 function Dashboard() {
   const [history, setHistory] = useState<Interview[]>([]);
+  const [sessions, setSessions] = useState<StoredSession[]>([]);
   useEffect(() => {
     setHistory(getHistory());
+    setSessions(getSessions());
   }, []);
 
-  const empty = history.length === 0;
+  const empty = history.length === 0 && sessions.length === 0;
 
   const stats = useMemo(() => {
     if (!history.length) return { count: 0, avg: 0, best: 0, streak: 0 };
@@ -42,6 +44,14 @@ function Dashboard() {
     const best = Math.max(...history.map((h) => h.score));
     return { count, avg, best, streak: streakDays(history) };
   }, [history]);
+
+  // Sessions are stored oldest → newest in "hiremate_sessions"
+  const latestSession = sessions[sessions.length - 1];
+  const previousSession = sessions[sessions.length - 2];
+  const scoreDelta =
+    latestSession && previousSession
+      ? latestSession.overall_score - previousSession.overall_score
+      : null;
 
   const weak = weakAreas(history);
   const topWeak = weak[0];
