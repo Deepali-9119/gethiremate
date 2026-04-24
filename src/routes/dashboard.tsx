@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { getHistory, weakAreas, type Interview, type Metric } from "@/lib/hiremate";
+import { getSessions, type StoredSession } from "@/lib/sessions";
 import { streakDays } from "@/lib/habits";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -11,6 +12,9 @@ import {
   Target,
   Sparkles,
   Star,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
@@ -25,11 +29,13 @@ export const Route = createFileRoute("/dashboard")({
 
 function Dashboard() {
   const [history, setHistory] = useState<Interview[]>([]);
+  const [sessions, setSessions] = useState<StoredSession[]>([]);
   useEffect(() => {
     setHistory(getHistory());
+    setSessions(getSessions());
   }, []);
 
-  const empty = history.length === 0;
+  const empty = history.length === 0 && sessions.length === 0;
 
   const stats = useMemo(() => {
     if (!history.length) return { count: 0, avg: 0, best: 0, streak: 0 };
@@ -38,6 +44,14 @@ function Dashboard() {
     const best = Math.max(...history.map((h) => h.score));
     return { count, avg, best, streak: streakDays(history) };
   }, [history]);
+
+  // Sessions are stored oldest → newest in "hiremate_sessions"
+  const latestSession = sessions[sessions.length - 1];
+  const previousSession = sessions[sessions.length - 2];
+  const scoreDelta =
+    latestSession && previousSession
+      ? latestSession.overall_score - previousSession.overall_score
+      : null;
 
   const weak = weakAreas(history);
   const topWeak = weak[0];
@@ -98,6 +112,16 @@ function Dashboard() {
                 hint={`${stats.streak} session${stats.streak === 1 ? "" : "s"} in a row`}
               />
             </div>
+
+            {/* Progress snapshot — latest vs previous session */}
+            {latestSession && (
+              <ProgressSnapshot
+                latest={latestSession}
+                previous={previousSession}
+                delta={scoreDelta}
+                total={sessions.length}
+              />
+            )}
 
             {/* Score trend */}
             <section className="rounded-3xl bg-card border border-border/70 p-6 sm:p-8 mb-10">
@@ -168,6 +192,9 @@ function Dashboard() {
 
             {/* Suggestion */}
             <SuggestionCard topWeak={topWeak} latestRole={history[0]?.role} />
+
+            {/* Session history (from hiremate_sessions) */}
+            {sessions.length > 0 && <SessionHistory sessions={sessions} />}
 
             {/* Bottom CTA */}
             <div className="mt-10 flex justify-center">
@@ -400,8 +427,10 @@ function EmptyState() {
       <div className="absolute inset-0 bg-grain opacity-40 pointer-events-none" />
       <div className="relative">
         <Sparkles className="h-7 w-7 text-coral mx-auto mb-3" />
-        <h2 className="font-display text-3xl font-semibold text-ink mb-2">No sessions yet.</h2>
-        <p className="text-ink/80 mb-6">Run your first mock interview — it takes about 10 minutes.</p>
+        <h2 className="font-display text-3xl font-semibold text-ink mb-2">
+          No interview sessions yet.
+        </h2>
+        <p className="text-ink/80 mb-6">Start your first mock interview — it takes about 10 minutes.</p>
         <Link
           to="/onboarding"
           className="inline-flex items-center gap-2 rounded-full bg-ink text-background px-6 py-3 text-sm font-medium hover:opacity-90 transition"
@@ -410,5 +439,146 @@ function EmptyState() {
         </Link>
       </div>
     </div>
+  );
+}
+
+function ProgressSnapshot({
+  latest,
+  previous,
+  delta,
+  total,
+}: {
+  latest: StoredSession;
+  previous?: StoredSession;
+  delta: number | null;
+  total: number;
+}) {
+  const trend =
+    delta === null ? "neutral" : delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+  const TrendIcon =
+    trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
+  const trendColor =
+    trend === "up"
+      ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+      : trend === "down"
+        ? "text-coral bg-coral-soft border-coral/20"
+        : "text-muted-foreground bg-secondary border-border/60";
+  const trendLabel =
+    delta === null
+      ? "First session"
+      : delta > 0
+        ? `+${delta} pts vs previous`
+        : delta < 0
+          ? `${delta} pts vs previous`
+          : "No change vs previous";
+
+  return (
+    <section className="rounded-3xl bg-card border border-border/70 p-6 sm:p-7 mb-10">
+      <div className="flex items-end justify-between flex-wrap gap-2 mb-5">
+        <div>
+          <h2 className="font-display text-2xl font-semibold">Progress snapshot</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {total} interview{total === 1 ? "" : "s"} saved on this device.
+          </p>
+        </div>
+        <div
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${trendColor}`}
+        >
+          <TrendIcon className="h-3.5 w-3.5" />
+          {trendLabel}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SnapshotTile label="Latest session" session={latest} accent />
+        {previous ? (
+          <SnapshotTile label="Previous session" session={previous} />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/70 p-5 grid place-items-center text-center text-sm text-muted-foreground">
+            Run another interview to compare your progress.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SnapshotTile({
+  label,
+  session,
+  accent,
+}: {
+  label: string;
+  session: StoredSession;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl p-5 border ${
+        accent ? "bg-peach border-coral/20" : "bg-secondary/40 border-border/60"
+      }`}
+    >
+      <p className="text-[11px] uppercase tracking-[0.16em] text-ink/60 font-semibold mb-2">
+        {label}
+      </p>
+      <div className="flex items-baseline gap-2">
+        <span className="font-display text-4xl font-semibold tabular-nums text-ink">
+          {session.overall_score}
+        </span>
+        <span className="text-sm text-ink/60">/100</span>
+      </div>
+      <p className="text-sm text-ink/80 mt-1 truncate">{session.role}</p>
+      <p className="text-xs text-ink/55 mt-0.5">
+        {new Date(session.date).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}
+      </p>
+    </div>
+  );
+}
+
+function SessionHistory({ sessions }: { sessions: StoredSession[] }) {
+  // Newest first for the list
+  const ordered = [...sessions].reverse();
+  return (
+    <section className="mt-10">
+      <div className="flex items-end justify-between mb-4">
+        <h2 className="font-display text-2xl font-semibold">Session history</h2>
+        <span className="text-xs text-muted-foreground">
+          {sessions.length} total
+        </span>
+      </div>
+      <ol className="rounded-3xl bg-card border border-border/70 overflow-hidden">
+        {ordered.map((s, i) => {
+          const sessionNumber = sessions.length - i;
+          return (
+            <li
+              key={s.id}
+              className={`flex items-center justify-between gap-4 p-4 sm:p-5 ${
+                i < ordered.length - 1 ? "border-b border-border/60" : ""
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">
+                  Session {sessionNumber} — {s.role}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {new Date(s.date).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+              <div className="font-display text-lg font-semibold tabular-nums shrink-0">
+                Score: {s.overall_score}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
