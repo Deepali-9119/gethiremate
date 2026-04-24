@@ -260,17 +260,6 @@ function Interview() {
                     </div>
                   )}
 
-                  <div className="rounded-2xl bg-coral-soft/60 border border-coral/20 p-4 mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-ink text-background font-semibold">
-                        Top candidate answer
-                      </span>
-                    </div>
-                    <p className="text-sm leading-relaxed font-display text-ink/90">
-                      {t.qa.improvedAnswer}
-                    </p>
-                  </div>
-
                   <div className="mb-4">
                     <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
                       How to improve
