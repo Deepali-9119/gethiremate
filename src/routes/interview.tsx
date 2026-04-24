@@ -252,48 +252,58 @@ function Interview() {
                       Per-answer feedback
                     </span>
                   </div>
-                  <p className="text-sm mb-1">
-                    <span className="text-success font-medium">What worked: </span>
-                    {t.qa.highlight}
-                  </p>
-                  <p className="text-sm mb-3">
-                    <span className="text-coral font-medium">Try next time: </span>
-                    {t.qa.improve}
-                  </p>
 
-                  {t.qa.missing.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                      {t.qa.missing.map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-warn/15 text-ink font-medium"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
+                  {t.qa.tooShort ? (
+                    <p className="text-sm leading-relaxed text-ink">
+                      It looks like your answer is too short. Try giving a more detailed response so I can provide meaningful feedback.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm mb-1">
+                        <span className="text-success font-medium">What worked: </span>
+                        {t.qa.highlight}
+                      </p>
+                      <p className="text-sm mb-3">
+                        <span className="text-coral font-medium">Try next time: </span>
+                        {t.qa.improve}
+                      </p>
+
+                      {t.qa.missing.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {t.qa.missing.map((tag) => (
+                            <span
+                              key={tag}
+                              className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-warn/15 text-ink font-medium"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mb-4">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+                          How to improve
+                        </p>
+                        <ul className="space-y-1.5">
+                          {t.qa.howToImprove.map((tip, idx) => (
+                            <li key={idx} className="text-sm flex gap-2">
+                              <span className="text-coral mt-1.5 h-1 w-1 rounded-full bg-coral shrink-0" />
+                              <span className="leading-relaxed">{tip}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/60">
+                        <MetricBar label="Clarity" value={m.clarity} />
+                        <MetricBar label="Structure" value={m.structure} />
+                        <MetricBar label="Confidence" value={m.confidence} />
+                        <MetricBar label="Relevance" value={m.relevance} />
+                      </div>
+                    </>
                   )}
 
-                  <div className="mb-4">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                      How to improve
-                    </p>
-                    <ul className="space-y-1.5">
-                      {t.qa.howToImprove.map((tip, idx) => (
-                        <li key={idx} className="text-sm flex gap-2">
-                          <span className="text-coral mt-1.5 h-1 w-1 rounded-full bg-coral shrink-0" />
-                          <span className="leading-relaxed">{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/60">
-                    <MetricBar label="Clarity" value={m.clarity} />
-                    <MetricBar label="Structure" value={m.structure} />
-                    <MetricBar label="Confidence" value={m.confidence} />
-                    <MetricBar label="Relevance" value={m.relevance} />
-                  </div>
                   {isLatestFeedback && !thinking && (
                     <div className="mt-4 pt-4 border-t border-border/60 flex justify-end">
                       <button
