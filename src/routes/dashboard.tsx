@@ -441,3 +441,144 @@ function EmptyState() {
     </div>
   );
 }
+
+function ProgressSnapshot({
+  latest,
+  previous,
+  delta,
+  total,
+}: {
+  latest: StoredSession;
+  previous?: StoredSession;
+  delta: number | null;
+  total: number;
+}) {
+  const trend =
+    delta === null ? "neutral" : delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+  const TrendIcon =
+    trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
+  const trendColor =
+    trend === "up"
+      ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+      : trend === "down"
+        ? "text-coral bg-coral-soft border-coral/20"
+        : "text-muted-foreground bg-secondary border-border/60";
+  const trendLabel =
+    delta === null
+      ? "First session"
+      : delta > 0
+        ? `+${delta} pts vs previous`
+        : delta < 0
+          ? `${delta} pts vs previous`
+          : "No change vs previous";
+
+  return (
+    <section className="rounded-3xl bg-card border border-border/70 p-6 sm:p-7 mb-10">
+      <div className="flex items-end justify-between flex-wrap gap-2 mb-5">
+        <div>
+          <h2 className="font-display text-2xl font-semibold">Progress snapshot</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {total} interview{total === 1 ? "" : "s"} saved on this device.
+          </p>
+        </div>
+        <div
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${trendColor}`}
+        >
+          <TrendIcon className="h-3.5 w-3.5" />
+          {trendLabel}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SnapshotTile label="Latest session" session={latest} accent />
+        {previous ? (
+          <SnapshotTile label="Previous session" session={previous} />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border/70 p-5 grid place-items-center text-center text-sm text-muted-foreground">
+            Run another interview to compare your progress.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SnapshotTile({
+  label,
+  session,
+  accent,
+}: {
+  label: string;
+  session: StoredSession;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl p-5 border ${
+        accent ? "bg-peach border-coral/20" : "bg-secondary/40 border-border/60"
+      }`}
+    >
+      <p className="text-[11px] uppercase tracking-[0.16em] text-ink/60 font-semibold mb-2">
+        {label}
+      </p>
+      <div className="flex items-baseline gap-2">
+        <span className="font-display text-4xl font-semibold tabular-nums text-ink">
+          {session.overall_score}
+        </span>
+        <span className="text-sm text-ink/60">/100</span>
+      </div>
+      <p className="text-sm text-ink/80 mt-1 truncate">{session.role}</p>
+      <p className="text-xs text-ink/55 mt-0.5">
+        {new Date(session.date).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}
+      </p>
+    </div>
+  );
+}
+
+function SessionHistory({ sessions }: { sessions: StoredSession[] }) {
+  // Newest first for the list
+  const ordered = [...sessions].reverse();
+  return (
+    <section className="mt-10">
+      <div className="flex items-end justify-between mb-4">
+        <h2 className="font-display text-2xl font-semibold">Session history</h2>
+        <span className="text-xs text-muted-foreground">
+          {sessions.length} total
+        </span>
+      </div>
+      <ol className="rounded-3xl bg-card border border-border/70 overflow-hidden">
+        {ordered.map((s, i) => {
+          const sessionNumber = sessions.length - i;
+          return (
+            <li
+              key={s.id}
+              className={`flex items-center justify-between gap-4 p-4 sm:p-5 ${
+                i < ordered.length - 1 ? "border-b border-border/60" : ""
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">
+                  Session {sessionNumber} — {s.role}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {new Date(s.date).toLocaleString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+              <div className="font-display text-lg font-semibold tabular-nums shrink-0">
+                Score: {s.overall_score}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
