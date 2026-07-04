@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "hiremate-mcp",
+      "version": "0.1.0",
+      "title": "HireMate MCP"
+    },
+    "tools": [
+      {
+        "name": "generate_interview_question",
+        "title": "Generate interview question",
+        "description": "Generate a mock interview question from HireMate's question bank for a given role and difficulty.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Target job role, e.g. 'Product Manager', 'Software Engineer', 'HR'."
+            },
+            "difficulty": {
+              "default": "medium",
+              "description": "Question difficulty: easy, medium, or hard.",
+              "type": "string",
+              "enum": [
+                "easy",
+                "medium",
+                "hard"
+              ]
+            },
+            "asked": {
+              "default": [],
+              "description": "Questions already asked in this session, to avoid repeats.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "role"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "score_answer",
+        "title": "Score interview answer",
+        "description": "Evaluate a candidate's answer to an interview question. Returns a score breakdown (clarity, structure, confidence, relevance), strengths, and areas of improvement.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The interview question that was asked."
+            },
+            "answer": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The candidate's answer to score."
+            }
+          },
+          "required": [
+            "question",
+            "answer"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
