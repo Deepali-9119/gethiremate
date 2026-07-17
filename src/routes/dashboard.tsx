@@ -31,10 +31,21 @@ export const Route = createFileRoute("/dashboard")({
 function Dashboard() {
   const [history, setHistory] = useState<Interview[]>([]);
   const [sessions, setSessions] = useState<StoredSession[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   useEffect(() => {
     setHistory(getHistory());
     setSessions(getSessions());
+    setProfile(getProfile());
   }, []);
+
+  const daysUntil = useMemo(() => {
+    if (!profile?.interviewDate) return null;
+    const target = new Date(profile.interviewDate + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((target.getTime() - today.getTime()) / 86_400_000);
+    return diff;
+  }, [profile]);
 
   const empty = history.length === 0 && sessions.length === 0;
 
