@@ -238,6 +238,7 @@ function Onboarding() {
       level: level ?? "Mid",
       focus: ["Behavioral", "Situational"],
       company: company ?? "General",
+      interviewDate: interviewDate ? format(interviewDate, "yyyy-MM-dd") : undefined,
     };
     saveProfile(profile);
     navigate({ to: "/interview" });
