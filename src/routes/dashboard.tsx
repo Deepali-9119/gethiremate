@@ -94,6 +94,37 @@ function Dashboard() {
           </Link>
         </div>
 
+        {daysUntil !== null && daysUntil >= 0 && (
+          <div className="mb-8 rounded-3xl gradient-warm p-6 sm:p-7 relative overflow-hidden">
+            <div className="absolute inset-0 bg-grain opacity-40" />
+            <div className="relative flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-ink/10 flex items-center justify-center">
+                  <CalendarDays className="h-5 w-5 text-ink" />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.15em] text-ink/60 font-semibold">
+                    Your interview
+                  </p>
+                  <p className="font-display text-2xl sm:text-3xl font-semibold text-ink leading-tight">
+                    {daysUntil === 0
+                      ? "It's today — you've got this."
+                      : daysUntil === 1
+                      ? "Tomorrow. One more focused rep?"
+                      : `In ${daysUntil} days`}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/onboarding"
+                className="inline-flex items-center gap-2 rounded-full bg-ink text-background px-5 py-3 text-sm font-medium hover:opacity-90 transition"
+              >
+                Practice now <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        )}
+
         {empty ? (
           <EmptyState />
         ) : (
