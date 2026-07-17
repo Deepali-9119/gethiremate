@@ -1,6 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
-import { ArrowRight, MessageSquare, BarChart3, Target, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowDown,
+  MessageSquare,
+  BarChart3,
+  Target,
+  Sparkles,
+  Star,
+} from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,6 +28,21 @@ export const Route = createFileRoute("/")({
   }),
   component: Landing,
 });
+
+const HOW_STEPS = [
+  { icon: Target, title: "Choose your role", body: "Tell HireMate what you're preparing for — PM, SWE, data, or something else." },
+  { icon: MessageSquare, title: "Practice a realistic AI interview", body: "One thoughtful question at a time, adapting to how you answer." },
+  { icon: Sparkles, title: "Get coaching + actionable improvements", body: "Per-answer scoring plus a plain-English fix you can use next time." },
+];
+
+const TRUST_CHIPS = [
+  { label: "Candidate Satisfaction", stars: true },
+  { label: "AI-powered interview coaching" },
+  { label: "Role-specific practice" },
+  { label: "Detailed personalized feedback" },
+];
+
+const COMPANY_WORDMARKS = ["Google", "Microsoft", "Amazon", "Meta", "Adobe", "Spotify"];
 
 function Landing() {
   return (
@@ -60,6 +83,90 @@ function Landing() {
           </div>
         </section>
 
+        {/* How HireMate works */}
+        <section className="max-w-6xl mx-auto px-5 pb-20">
+          <div className="mb-8 max-w-2xl">
+            <p className="text-xs uppercase tracking-[0.18em] text-coral font-semibold mb-2">
+              How HireMate works
+            </p>
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold leading-tight">
+              Three steps between you and a better interview.
+            </h2>
+          </div>
+          <div className="flex flex-col md:flex-row md:items-stretch gap-4 md:gap-2">
+            {HOW_STEPS.map(({ icon: Icon, title, body }, i) => (
+              <>
+                <div
+                  key={title}
+                  className="flex-1 rounded-3xl bg-card border border-border/70 p-6 hover:shadow-warm transition"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-9 w-9 rounded-xl bg-coral-soft flex items-center justify-center">
+                      <Icon className="h-4.5 w-4.5 text-ink" />
+                    </div>
+                    <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                      Step {i + 1}
+                    </span>
+                  </div>
+                  <h3 className="font-display text-lg font-semibold mb-1.5">{title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+                </div>
+                {i < HOW_STEPS.length - 1 && (
+                  <div
+                    key={`arrow-${i}`}
+                    className="flex md:items-center justify-center text-coral/60 shrink-0"
+                    aria-hidden
+                  >
+                    <ArrowDown className="h-5 w-5 md:hidden" />
+                    <ArrowRight className="hidden md:block h-5 w-5" />
+                  </div>
+                )}
+              </>
+            ))}
+          </div>
+        </section>
+
+        {/* Credibility strip */}
+        <section className="max-w-6xl mx-auto px-5 pb-20">
+          <div className="rounded-3xl bg-card border border-border/70 p-6 sm:p-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+              {TRUST_CHIPS.map((chip) => (
+                <div
+                  key={chip.label}
+                  className="rounded-2xl bg-peach/60 border border-coral/15 px-4 py-3 flex flex-col gap-1"
+                >
+                  {chip.stars ? (
+                    <span className="inline-flex items-center gap-0.5 text-coral">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} className="h-3.5 w-3.5 fill-coral text-coral" />
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="h-3.5" aria-hidden />
+                  )}
+                  <p className="text-[13px] leading-snug text-ink font-medium">{chip.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-border/60">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold text-center mb-4">
+                Trusted by candidates preparing for
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-x-8 sm:gap-x-12 gap-y-3 grayscale opacity-60">
+                {COMPANY_WORDMARKS.map((name) => (
+                  <span
+                    key={name}
+                    className="font-display text-lg sm:text-xl font-semibold tracking-wide text-ink/80 select-none"
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Three pillars */}
         <section className="max-w-6xl mx-auto px-5 pb-24">
           <div className="grid sm:grid-cols-3 gap-4">
@@ -94,16 +201,16 @@ function Landing() {
           </div>
         </section>
 
-        {/* Footer CTA */}
+        {/* Footer CTA — generic, no personalization */}
         <section className="max-w-6xl mx-auto px-5 pb-24">
           <div className="rounded-[2rem] gradient-warm p-10 sm:p-16 relative overflow-hidden">
             <div className="absolute inset-0 bg-grain opacity-40" />
             <div className="relative max-w-2xl">
               <h2 className="font-display text-4xl sm:text-5xl font-semibold leading-tight text-ink">
-                Your next interview is in 5 days.
+                Every mock interview brings you closer to your real one.
               </h2>
               <p className="mt-4 text-ink/80">
-                That's nine practice rounds. Let's not waste them.
+                Practice today. Perform better tomorrow.
               </p>
               <Link
                 to="/onboarding"
@@ -118,3 +225,4 @@ function Landing() {
     </div>
   );
 }
+
