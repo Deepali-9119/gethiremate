@@ -8,6 +8,7 @@ export type Profile = {
   focus: string[];
   company?: Company;
   resumeName?: string;
+  interviewDate?: string; // ISO date (YYYY-MM-DD)
 };
 
 export type Metric = {

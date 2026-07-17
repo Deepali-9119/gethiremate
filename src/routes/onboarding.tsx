@@ -2,7 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useEffect, useRef, useState } from "react";
 import { saveProfile, type Company, type Level, type Profile } from "@/lib/hiremate";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
@@ -17,7 +22,7 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 // ---------- types ----------
-type StepId = "role" | "roleOther" | "level" | "company" | "ready" | "done";
+type StepId = "role" | "roleOther" | "level" | "company" | "date" | "ready" | "done";
 
 type Bubble =
   | { kind: "ai"; text: string }
@@ -60,6 +65,7 @@ function Onboarding() {
   const [level, setLevel] = useState<Level | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [otherInput, setOtherInput] = useState("");
+  const [interviewDate, setInterviewDate] = useState<Date | undefined>(undefined);
   const [skippedAll, setSkippedAll] = useState(false);
   const [allSkipped, setAllSkipped] = useState({ role: false, level: false, company: false });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -153,7 +159,27 @@ function Onboarding() {
     setCompany(opt.value);
     sayUser(opt.label);
     setStep("done");
+    setTimeout(() => {
+      sayAi(
+        "Nice. One last (optional) thing — when's your interview? I'll show a countdown on your dashboard so we can plan practice around it.",
+        () => setStep("date"),
+      );
+    }, STEP_GAP_MS);
+  };
+
+  const pickDate = (d: Date) => {
+    setInterviewDate(d);
+    sayUser(`Interview on ${format(d, "PPP")}`);
+    setStep("done");
     setTimeout(() => goReady(false), STEP_GAP_MS);
+  };
+
+  const skipDate = () => {
+    sayUser("Skip — no date yet");
+    setStep("done");
+    setTimeout(() => {
+      sayAi("No worries — you can add it later from the dashboard.", () => goReady(false));
+    }, STEP_GAP_MS);
   };
 
   // ---------- skip handlers ----------
@@ -212,6 +238,7 @@ function Onboarding() {
       level: level ?? "Mid",
       focus: ["Behavioral", "Situational"],
       company: company ?? "General",
+      interviewDate: interviewDate ? format(interviewDate, "yyyy-MM-dd") : undefined,
     };
     saveProfile(profile);
     navigate({ to: "/interview" });
@@ -321,6 +348,45 @@ function Onboarding() {
               </SkipLink>
             </StepBlock>
           )}
+
+          {/* STEP: interview date (optional) */}
+          {step === "date" && (
+            <StepBlock>
+              <div className="pl-11">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full sm:w-auto justify-start gap-2 rounded-full border-border bg-background px-5 py-6 text-sm font-normal",
+                        !interviewDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="h-4 w-4" />
+                      {interviewDate ? format(interviewDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={interviewDate}
+                      onSelect={(d) => d && pickDate(d)}
+                      disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <SkipLink
+                onClick={skipDate}
+                tooltip="You can add your interview date later from the dashboard"
+              >
+                Skip — I don't have a date yet
+              </SkipLink>
+            </StepBlock>
+          )}
+
 
           {/* STEP: ready */}
           {step === "ready" && (
