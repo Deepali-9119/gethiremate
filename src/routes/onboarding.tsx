@@ -2,7 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useEffect, useRef, useState } from "react";
 import { saveProfile, type Company, type Level, type Profile } from "@/lib/hiremate";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
