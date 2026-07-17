@@ -349,6 +349,45 @@ function Onboarding() {
             </StepBlock>
           )}
 
+          {/* STEP: interview date (optional) */}
+          {step === "date" && (
+            <StepBlock>
+              <div className="pl-11">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full sm:w-auto justify-start gap-2 rounded-full border-border bg-background px-5 py-6 text-sm font-normal",
+                        !interviewDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="h-4 w-4" />
+                      {interviewDate ? format(interviewDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={interviewDate}
+                      onSelect={(d) => d && pickDate(d)}
+                      disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <SkipLink
+                onClick={skipDate}
+                tooltip="You can add your interview date later from the dashboard"
+              >
+                Skip — I don't have a date yet
+              </SkipLink>
+            </StepBlock>
+          )}
+
+
           {/* STEP: ready */}
           {step === "ready" && (
             <StepBlock>
