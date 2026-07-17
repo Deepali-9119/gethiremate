@@ -65,6 +65,7 @@ function Onboarding() {
   const [level, setLevel] = useState<Level | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [otherInput, setOtherInput] = useState("");
+  const [interviewDate, setInterviewDate] = useState<Date | undefined>(undefined);
   const [skippedAll, setSkippedAll] = useState(false);
   const [allSkipped, setAllSkipped] = useState({ role: false, level: false, company: false });
   const scrollRef = useRef<HTMLDivElement>(null);
