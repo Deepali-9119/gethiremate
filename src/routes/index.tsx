@@ -95,14 +95,11 @@ function Landing() {
           </div>
           <div className="flex flex-col md:flex-row md:items-stretch gap-4 md:gap-2">
             {HOW_STEPS.map(({ icon: Icon, title, body }, i) => (
-              <>
-                <div
-                  key={title}
-                  className="flex-1 rounded-3xl bg-card border border-border/70 p-6 hover:shadow-warm transition"
-                >
+              <div key={title} className="contents">
+                <div className="flex-1 rounded-3xl bg-card border border-border/70 p-6 hover:shadow-warm transition">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="h-9 w-9 rounded-xl bg-coral-soft flex items-center justify-center">
-                      <Icon className="h-4.5 w-4.5 text-ink" />
+                      <Icon className="h-4 w-4 text-ink" />
                     </div>
                     <span className="text-xs font-semibold text-muted-foreground tabular-nums">
                       Step {i + 1}
@@ -113,7 +110,6 @@ function Landing() {
                 </div>
                 {i < HOW_STEPS.length - 1 && (
                   <div
-                    key={`arrow-${i}`}
                     className="flex md:items-center justify-center text-coral/60 shrink-0"
                     aria-hidden
                   >
@@ -121,7 +117,7 @@ function Landing() {
                     <ArrowRight className="hidden md:block h-5 w-5" />
                   </div>
                 )}
-              </>
+              </div>
             ))}
           </div>
         </section>
