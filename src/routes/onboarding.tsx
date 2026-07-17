@@ -159,7 +159,27 @@ function Onboarding() {
     setCompany(opt.value);
     sayUser(opt.label);
     setStep("done");
+    setTimeout(() => {
+      sayAi(
+        "Nice. One last (optional) thing — when's your interview? I'll show a countdown on your dashboard so we can plan practice around it.",
+        () => setStep("date"),
+      );
+    }, STEP_GAP_MS);
+  };
+
+  const pickDate = (d: Date) => {
+    setInterviewDate(d);
+    sayUser(`Interview on ${format(d, "PPP")}`);
+    setStep("done");
     setTimeout(() => goReady(false), STEP_GAP_MS);
+  };
+
+  const skipDate = () => {
+    sayUser("Skip — no date yet");
+    setStep("done");
+    setTimeout(() => {
+      sayAi("No worries — you can add it later from the dashboard.", () => goReady(false));
+    }, STEP_GAP_MS);
   };
 
   // ---------- skip handlers ----------
