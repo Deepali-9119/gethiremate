@@ -6,6 +6,7 @@ import { streakDays } from "@/lib/habits";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  CalendarDays,
   Flame,
   TrendingUp,
   Trophy,
