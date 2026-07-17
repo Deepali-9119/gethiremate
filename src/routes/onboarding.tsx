@@ -22,7 +22,7 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 // ---------- types ----------
-type StepId = "role" | "roleOther" | "level" | "company" | "ready" | "done";
+type StepId = "role" | "roleOther" | "level" | "company" | "date" | "ready" | "done";
 
 type Bubble =
   | { kind: "ai"; text: string }
