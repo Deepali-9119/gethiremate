@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getHistory, weakAreas, type Interview, type Metric } from "@/lib/hiremate";
+import { getHistory, getProfile, weakAreas, type Interview, type Metric, type Profile } from "@/lib/hiremate";
 import { getSessions, type StoredSession } from "@/lib/sessions";
 import { streakDays } from "@/lib/habits";
 import { useEffect, useMemo, useState } from "react";
