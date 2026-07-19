@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { useEffect, useRef, useState } from "react";
 import { saveProfile, type Company, type Level, type Profile } from "@/lib/hiremate";
-import { ArrowRight, CalendarIcon } from "lucide-react";
+import { ArrowRight, CalendarIcon, Search } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 // ---------- types ----------
-type StepId = "role" | "roleOther" | "level" | "company" | "date" | "ready" | "done";
+type StepId = "role" | "level" | "company" | "companyOther" | "date" | "ready" | "done";
 
 type Bubble =
   | { kind: "ai"; text: string }
@@ -32,10 +32,15 @@ type Bubble =
 const ROLE_OPTIONS = [
   "Product Manager",
   "Software Engineer",
-  "Data Analyst",
   "Business Analyst",
-  "UX Designer",
-  "Other",
+  "Marketing",
+  "Consultant",
+  "Designer",
+  "Sales",
+  "Finance",
+  "Teacher",
+  "Customer Success",
+  "HR",
 ];
 
 const LEVEL_OPTIONS: { label: string; value: Level }[] = [
@@ -45,13 +50,17 @@ const LEVEL_OPTIONS: { label: string; value: Level }[] = [
   { label: "5+ years", value: "Senior" },
 ];
 
-const COMPANY_OPTIONS: { label: string; value: Company }[] = [
+type CompanyChoice = { label: string; value: Company; kind?: "other" };
+const COMPANY_OPTIONS: CompanyChoice[] = [
   { label: "Google", value: "Big Tech" },
   { label: "Amazon", value: "Big Tech" },
   { label: "Microsoft", value: "Big Tech" },
-  { label: "Flipkart", value: "Big Tech" },
+  { label: "Meta", value: "Big Tech" },
+  { label: "Apple", value: "Big Tech" },
+  { label: "Netflix", value: "Big Tech" },
   { label: "Startup", value: "Startup" },
-  { label: "General practice", value: "General" },
+  { label: "General Practice", value: "General" },
+  { label: "Other", value: "General", kind: "other" },
 ];
 
 const TYPING_MS = 1000;
@@ -64,10 +73,10 @@ function Onboarding() {
   const [role, setRole] = useState("");
   const [level, setLevel] = useState<Level | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
-  const [otherInput, setOtherInput] = useState("");
+  const [companyName, setCompanyName] = useState<string | undefined>(undefined);
+  const [roleQuery, setRoleQuery] = useState("");
+  const [companyOtherInput, setCompanyOtherInput] = useState("");
   const [interviewDate, setInterviewDate] = useState<Date | undefined>(undefined);
-  const [skippedAll, setSkippedAll] = useState(false);
-  const [allSkipped, setAllSkipped] = useState({ role: false, level: false, company: false });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Bootstrap initial AI welcome (typing → message)
@@ -98,7 +107,6 @@ function Onboarding() {
     setTimeout(() => {
       setBubbles((b) => {
         const copy = [...b];
-        // replace last typing with ai message
         for (let i = copy.length - 1; i >= 0; i--) {
           if (copy[i].kind === "typing") {
             copy[i] = { kind: "ai", text };
@@ -112,35 +120,23 @@ function Onboarding() {
   };
 
   // ---------- step handlers ----------
-  const pickRole = (r: string) => {
-    if (r === "Other") {
-      setStep("roleOther");
-      return;
-    }
+  const chooseRole = (r: string) => {
     setRole(r);
     sayUser(r);
-    setStep("done"); // hide chips immediately
+    setRoleQuery("");
+    setStep("done");
     setTimeout(() => {
       sayAi(
-        `Great choice. ${r} interviews can be tricky — but that's exactly what I'm built for. 💪\n\nHow much experience do you have?`,
+        `Great choice. ${r} interviews can be tricky — but that's exactly what I'm built for. 💪\n\nWe'll adjust question difficulty based on your experience. How much experience do you have?`,
         () => setStep("level"),
       );
     }, STEP_GAP_MS);
   };
 
-  const submitOther = () => {
-    const v = otherInput.trim();
+  const submitRoleQuery = () => {
+    const v = roleQuery.trim();
     if (!v) return;
-    setRole(v);
-    sayUser(v);
-    setOtherInput("");
-    setStep("done");
-    setTimeout(() => {
-      sayAi(
-        `Great choice. ${v} interviews can be tricky — but that's exactly what I'm built for. 💪\n\nHow much experience do you have?`,
-        () => setStep("level"),
-      );
-    }, STEP_GAP_MS);
+    chooseRole(v);
   };
 
   const pickLevel = (opt: { label: string; value: Level }) => {
@@ -149,14 +145,19 @@ function Onboarding() {
     setStep("done");
     setTimeout(() => {
       sayAi(
-        "Got it. I'll calibrate the questions to your level.\n\nOne more thing — any specific company you're targeting, or just general practice?",
+        "Got it. I'll calibrate the questions to your level.\n\nIf you're preparing for a specific company we'll tailor questions accordingly. Any company in mind, or just general practice?",
         () => setStep("company"),
       );
     }, STEP_GAP_MS);
   };
 
-  const pickCompany = (opt: { label: string; value: Company }) => {
+  const pickCompany = (opt: CompanyChoice) => {
+    if (opt.kind === "other") {
+      setStep("companyOther");
+      return;
+    }
     setCompany(opt.value);
+    setCompanyName(opt.label);
     sayUser(opt.label);
     setStep("done");
     setTimeout(() => {
@@ -167,69 +168,74 @@ function Onboarding() {
     }, STEP_GAP_MS);
   };
 
+  const submitCompanyOther = () => {
+    const v = companyOtherInput.trim();
+    if (!v) return;
+    setCompany("General");
+    setCompanyName(v);
+    sayUser(v);
+    setCompanyOtherInput("");
+    setStep("done");
+    setTimeout(() => {
+      sayAi(
+        `Got it — I'll keep ${v} in mind. One last (optional) thing — when's your interview?`,
+        () => setStep("date"),
+      );
+    }, STEP_GAP_MS);
+  };
+
   const pickDate = (d: Date) => {
     setInterviewDate(d);
     sayUser(`Interview on ${format(d, "PPP")}`);
     setStep("done");
-    setTimeout(() => goReady(false), STEP_GAP_MS);
+    setTimeout(() => emitReadySummary(false), STEP_GAP_MS);
   };
 
-  const skipDate = () => {
-    sayUser("Skip — no date yet");
-    setStep("done");
-    setTimeout(() => {
-      sayAi("No worries — you can add it later from the dashboard.", () => goReady(false));
-    }, STEP_GAP_MS);
-  };
-
-  // ---------- skip handlers ----------
+  // ---------- skip handlers (single ack bubble each) ----------
   const skipRole = () => {
     sayUser("Skip — general interview");
-    setAllSkipped((s) => ({ ...s, role: true }));
-    setSkippedAll(true);
     setStep("done");
     setTimeout(() => {
       sayAi(
-        "No problem 👍 I'll run a general interview covering common behavioral and situational questions. Let's go!",
-        () => goReady(true),
+        "No problem 👍 I'll run a well-rounded interview suitable for most roles.\n\n• 5–6 real interview questions\n• Follow-ups based on your answers\n• A detailed scorecard at the end\n\nReady when you are.",
+        () => setStep("ready"),
       );
     }, STEP_GAP_MS);
   };
 
   const skipLevel = () => {
     sayUser("Skip — any level");
-    setAllSkipped((s) => ({ ...s, level: true }));
     setStep("done");
     setTimeout(() => {
-      sayAi("Got it 👍 I'll mix in questions suitable for all experience levels.", () => {
-        setTimeout(() => {
-          sayAi(
-            "One more thing — any specific company you're targeting, or just general practice?",
-            () => setStep("company"),
-          );
-        }, STEP_GAP_MS);
-      });
+      sayAi(
+        "Got it 👍 I'll keep the difficulty balanced. Any specific company you're targeting, or just general practice?",
+        () => setStep("company"),
+      );
     }, STEP_GAP_MS);
   };
 
   const skipCompany = () => {
     sayUser("Skip — general practice");
-    setAllSkipped((s) => ({ ...s, company: true }));
     setStep("done");
     setTimeout(() => {
-      sayAi("No worries 👍 I'll use a well-rounded question set that works across companies.", () =>
-        goReady(false),
+      sayAi(
+        "No worries 👍 I'll keep it broad. Last thing (optional) — when's your interview?",
+        () => setStep("date"),
       );
     }, STEP_GAP_MS);
   };
 
-  const goReady = (fullSkip: boolean) => {
+  const skipDate = () => {
+    sayUser("Skip — no date yet");
+    setStep("done");
+    setTimeout(() => emitReadySummary(false), STEP_GAP_MS);
+  };
+
+  const emitReadySummary = (fullSkip: boolean) => {
     const text = fullSkip
       ? "All good 👍 I'll run a general mock interview — a mix of behavioral and situational questions suitable for any role and experience level.\n\n• 5–6 real interview questions\n• Follow-ups based on your answers\n• A detailed scorecard at the end\n\nReady when you are."
       : "All set ✅ Here's what's coming:\n\n• 5–6 real interview questions\n• Follow-ups based on your answers\n• A detailed scorecard at the end\n\nTake your time with each answer. No rush. Ready?";
-    setTimeout(() => {
-      sayAi(text, () => setStep("ready"));
-    }, STEP_GAP_MS);
+    sayAi(text, () => setStep("ready"));
   };
 
   const begin = () => {
@@ -238,11 +244,19 @@ function Onboarding() {
       level: level ?? "Mid",
       focus: ["Behavioral", "Situational"],
       company: company ?? "General",
+      companyName,
       interviewDate: interviewDate ? format(interviewDate, "yyyy-MM-dd") : undefined,
     };
     saveProfile(profile);
     navigate({ to: "/interview" });
   };
+
+  // Filter role chips by search query
+  const q = roleQuery.trim().toLowerCase();
+  const filteredRoles = q
+    ? ROLE_OPTIONS.filter((r) => r.toLowerCase().includes(q))
+    : ROLE_OPTIONS;
+  const showCustomRoleCTA = q.length > 0 && filteredRoles.length === 0;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -263,51 +277,48 @@ function Onboarding() {
             return <UserBubble key={i} text={b.text} />;
           })}
 
-          {/* STEP: role chips */}
+          {/* STEP: role — search + chips */}
           {step === "role" && (
             <StepBlock>
-              <ChipGrid>
-                {ROLE_OPTIONS.map((r) => (
-                  <Chip key={r} onClick={() => pickRole(r)}>
-                    {r}
-                  </Chip>
-                ))}
-              </ChipGrid>
+              <div className="pl-11 space-y-3">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    submitRoleQuery();
+                  }}
+                  className="relative"
+                >
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    value={roleQuery}
+                    onChange={(e) => setRoleQuery(e.target.value)}
+                    placeholder="Search your role..."
+                    className="w-full rounded-full border border-border bg-background pl-10 pr-4 py-3 text-sm outline-none focus:border-coral transition"
+                  />
+                </form>
+                {showCustomRoleCTA ? (
+                  <button
+                    onClick={submitRoleQuery}
+                    className="min-h-[44px] w-full sm:w-auto rounded-full border border-coral bg-foreground text-background hover:opacity-90 active:scale-[0.97] transition px-4 py-2.5 text-sm inline-flex items-center gap-2"
+                  >
+                    Use "{roleQuery.trim()}" as your role <ArrowRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                    {filteredRoles.map((r) => (
+                      <Chip key={r} onClick={() => chooseRole(r)}>
+                        {r}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+              </div>
               <SkipLink
                 onClick={skipRole}
                 tooltip="We'll run a general interview covering common questions"
               >
                 Skip — surprise me with a general interview
               </SkipLink>
-            </StepBlock>
-          )}
-
-          {/* STEP: role "Other" input */}
-          {step === "roleOther" && (
-            <StepBlock>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  submitOther();
-                }}
-                className="flex gap-2"
-              >
-                <input
-                  autoFocus
-                  value={otherInput}
-                  onChange={(e) => setOtherInput(e.target.value)}
-                  placeholder="Type your role (e.g. DevOps Engineer at a startup)"
-                  className="flex-1 rounded-full border border-border bg-background px-5 py-3 text-sm outline-none focus:border-coral transition"
-                />
-                <button
-                  type="submit"
-                  disabled={!otherInput.trim()}
-                  className="rounded-full bg-foreground text-background px-5 py-3 text-sm font-medium disabled:opacity-40 transition"
-                  aria-label="Submit role"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </form>
             </StepBlock>
           )}
 
@@ -349,6 +360,35 @@ function Onboarding() {
             </StepBlock>
           )}
 
+          {/* STEP: company — Other freeform */}
+          {step === "companyOther" && (
+            <StepBlock>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submitCompanyOther();
+                }}
+                className="pl-11 flex gap-2"
+              >
+                <input
+                  autoFocus
+                  value={companyOtherInput}
+                  onChange={(e) => setCompanyOtherInput(e.target.value)}
+                  placeholder="Type a company (e.g. Stripe, Zomato)"
+                  className="flex-1 rounded-full border border-border bg-background px-5 py-3 text-sm outline-none focus:border-coral transition"
+                />
+                <button
+                  type="submit"
+                  disabled={!companyOtherInput.trim()}
+                  className="rounded-full bg-foreground text-background px-5 py-3 text-sm font-medium disabled:opacity-40 transition"
+                  aria-label="Submit company"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </form>
+            </StepBlock>
+          )}
+
           {/* STEP: interview date (optional) */}
           {step === "date" && (
             <StepBlock>
@@ -387,7 +427,6 @@ function Onboarding() {
             </StepBlock>
           )}
 
-
           {/* STEP: ready */}
           {step === "ready" && (
             <StepBlock>
@@ -410,12 +449,6 @@ function Onboarding() {
             </StepBlock>
           )}
         </div>
-        {/* Tiny hint (avoids unused-state warning + gives flow context) */}
-        {skippedAll && allSkipped.role && step === "ready" && (
-          <p className="mt-3 text-[11px] text-center text-muted-foreground">
-            General interview mode — no preferences saved.
-          </p>
-        )}
       </main>
     </div>
   );
@@ -498,19 +531,10 @@ function TypingBubble() {
         H
       </div>
       <div className="rounded-2xl rounded-tl-md bg-secondary px-4 py-3 inline-flex items-center gap-1">
-        <Dot delay="0ms" />
-        <Dot delay="150ms" />
-        <Dot delay="300ms" />
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.2s]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:-0.1s]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce" />
       </div>
     </div>
-  );
-}
-
-function Dot({ delay }: { delay: string }) {
-  return (
-    <span
-      className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce"
-      style={{ animationDelay: delay, animationDuration: "1s" }}
-    />
   );
 }
