@@ -7,6 +7,7 @@ export type Profile = {
   level: Level;
   focus: string[];
   company?: Company;
+  companyName?: string; // display label (e.g. "Netflix", "Acme Corp")
   resumeName?: string;
   interviewDate?: string; // ISO date (YYYY-MM-DD)
 };
