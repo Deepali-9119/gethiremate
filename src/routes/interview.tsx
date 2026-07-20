@@ -11,9 +11,11 @@ import {
   type Interview,
   type QA,
 } from "@/lib/hiremate";
+import type { HighlightSpan } from "@/lib/hiremate";
 import { appendSession, summarizeQAs } from "@/lib/sessions";
 import { MetricBar } from "@/components/MetricBar";
-import { ArrowRight, Send, Sparkles, Flag, RotateCcw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ArrowRight, Send, Sparkles, Flag, RotateCcw, Check, AlertTriangle, Info } from "lucide-react";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
