@@ -266,33 +266,8 @@ export function nextDifficulty(prev?: Metric): "easy" | "medium" | "hard" {
   return "easy";
 }
 
-// Mock feedback scoring — deterministic-ish from answer length & keywords
-export function scoreAnswer(question: string, answer: string): QA {
-  const a = answer.trim();
-  const words = a.split(/\s+/).filter(Boolean);
-  const wc = words.length;
 
-  // Too-short / generic answers: skip positive feedback entirely.
-  const isGeneric = /^(ok(ay)?|yes|yeah|yep|no|nope|nah|sure|maybe|idk|dunno|n\/a|na|none|nothing)[.!?\s]*$/i.test(a);
-  if (a.length < 12 || isGeneric) {
-    const tooShortMsg =
-      "It looks like your answer is too short. Try giving a more detailed response so I can provide meaningful feedback.";
-    const lowMetrics: Metric = { clarity: 20, structure: 20, confidence: 20, relevance: 20 };
-    return {
-      id: crypto.randomUUID(),
-      question,
-      answer: a,
-      difficulty: "medium",
-      feedback: tooShortMsg,
-      highlight: tooShortMsg,
-      improve: "",
-      metrics: lowMetrics,
-      improvedAnswer: "",
-      howToImprove: [],
-      missing: [],
-      tooShort: true,
-    };
-  }
+
 
 // ===== Feedback engine =====
 // Independent per-metric evaluators. Every "Try next time" tip is derived
