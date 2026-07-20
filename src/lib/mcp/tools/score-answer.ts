@@ -16,15 +16,15 @@ export default defineTool({
     const qa = scoreAnswer(question, answer);
     const summary = qa.tooShort
       ? "Answer too short to evaluate meaningfully."
-      : `What worked: ${qa.highlight}\nTry next time: ${qa.improve}`;
+      : `What worked:\n- ${qa.worked.join("\n- ")}\n\nTry next time:\n- ${qa.tryNext.join("\n- ")}`;
     return {
       content: [{ type: "text", text: summary }],
       structuredContent: {
         metrics: qa.metrics,
-        highlight: qa.highlight,
-        improve: qa.improve,
-        howToImprove: qa.howToImprove,
+        worked: qa.worked,
+        tryNext: qa.tryNext,
         missing: qa.missing,
+        spans: qa.spans,
         tooShort: qa.tooShort ?? false,
       },
     };
