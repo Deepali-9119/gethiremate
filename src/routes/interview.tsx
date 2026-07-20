@@ -265,14 +265,37 @@ function Interview() {
                     </p>
                   ) : (
                     <>
-                      <p className="text-sm mb-1">
-                        <span className="text-success font-medium">What worked: </span>
-                        {t.qa.highlight}
-                      </p>
-                      <p className="text-sm mb-3">
-                        <span className="text-coral font-medium">Try next time: </span>
-                        {t.qa.improve}
-                      </p>
+                      {t.qa.worked.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs uppercase tracking-wider text-success mb-2 font-medium">
+                            What worked
+                          </p>
+                          <ul className="space-y-1.5">
+                            {t.qa.worked.map((w, idx) => (
+                              <li key={idx} className="text-sm flex gap-2">
+                                <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+                                <span className="leading-relaxed">{w}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {t.qa.tryNext.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs uppercase tracking-wider text-coral mb-2 font-medium">
+                            Try next time
+                          </p>
+                          <ul className="space-y-1.5">
+                            {t.qa.tryNext.map((tip, idx) => (
+                              <li key={idx} className="text-sm flex gap-2">
+                                <ArrowRight className="h-3.5 w-3.5 text-coral shrink-0 mt-0.5" />
+                                <span className="leading-relaxed">{tip}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
                       {t.qa.missing.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-4">
@@ -287,19 +310,14 @@ function Interview() {
                         </div>
                       )}
 
-                      <div className="mb-4">
-                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                          How to improve
+                      {t.qa.spans.length > 0 && (
+                        <p className="text-xs text-muted-foreground mb-4 flex items-center gap-3 flex-wrap">
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-success" /> Strong</span>
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-warn" /> Vague</span>
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-info" /> Missing impact</span>
+                          <span className="opacity-70">— tap a highlighted line in your answer for the fix.</span>
                         </p>
-                        <ul className="space-y-1.5">
-                          {t.qa.howToImprove.map((tip, idx) => (
-                            <li key={idx} className="text-sm flex gap-2">
-                              <span className="text-coral mt-1.5 h-1 w-1 rounded-full bg-coral shrink-0" />
-                              <span className="leading-relaxed">{tip}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      )}
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/60">
                         <MetricBar label="Clarity" value={m.clarity} />
