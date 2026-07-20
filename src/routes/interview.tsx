@@ -439,3 +439,38 @@ function Dot({ delay = 0 }: { delay?: number }) {
   );
 }
 
+
+function HighlightedAnswer({ text, spans }: { text: string; spans: HighlightSpan[] }) {
+  if (!spans.length) return <>{text}</>;
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  sorted.forEach((s, i) => {
+    if (s.start > cursor) parts.push(<span key={`t-${i}`}>{text.slice(cursor, s.start)}</span>);
+    const chunk = text.slice(s.start, s.end);
+    const styles =
+      s.type === "strong"
+        ? "underline decoration-2 decoration-success/80 underline-offset-4"
+        : s.type === "vague"
+          ? "underline decoration-2 decoration-warn underline-offset-4 bg-warn/10 rounded px-0.5"
+          : "underline decoration-2 decoration-info underline-offset-4 bg-info/10 rounded px-0.5";
+    const Icon = s.type === "strong" ? Check : s.type === "vague" ? AlertTriangle : Info;
+    const iconTone = s.type === "strong" ? "text-success" : s.type === "vague" ? "text-warn" : "text-info";
+    parts.push(
+      <Popover key={`s-${i}`}>
+        <PopoverTrigger asChild>
+          <button className={`${styles} text-left cursor-pointer`}>{chunk}</button>
+        </PopoverTrigger>
+        <PopoverContent side="top" className="w-72 text-xs leading-relaxed">
+          <div className="flex gap-2 items-start">
+            <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${iconTone}`} />
+            <p className="text-ink">{s.tip}</p>
+          </div>
+        </PopoverContent>
+      </Popover>,
+    );
+    cursor = s.end;
+  });
+  if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
+  return <>{parts}</>;
+}
