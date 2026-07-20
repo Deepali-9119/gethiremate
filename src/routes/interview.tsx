@@ -443,7 +443,7 @@ function Dot({ delay = 0 }: { delay?: number }) {
 function HighlightedAnswer({ text, spans }: { text: string; spans: HighlightSpan[] }) {
   if (!spans.length) return <>{text}</>;
   const sorted = [...spans].sort((a, b) => a.start - b.start);
-  const parts: React.ReactNode[] = [];
+  const parts: ReactNode[] = [];
   let cursor = 0;
   sorted.forEach((s, i) => {
     if (s.start > cursor) parts.push(<span key={`t-${i}`}>{text.slice(cursor, s.start)}</span>);
