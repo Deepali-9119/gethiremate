@@ -19,6 +19,13 @@ export type Metric = {
   relevance: number;
 };
 
+export type HighlightSpan = {
+  start: number;
+  end: number;
+  type: "strong" | "vague" | "missing-impact";
+  tip: string;
+};
+
 export type QA = {
   id: string;
   question: string;
@@ -31,6 +38,9 @@ export type QA = {
   improvedAnswer: string;
   howToImprove: string[];
   missing: string[];
+  worked: string[];
+  tryNext: string[];
+  spans: HighlightSpan[];
   tooShort?: boolean;
 };
 
