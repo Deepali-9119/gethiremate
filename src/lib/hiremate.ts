@@ -294,79 +294,334 @@ export function scoreAnswer(question: string, answer: string): QA {
     };
   }
 
-  const hasStructure = /first|second|then|finally|step|because|so that/i.test(a);
-  const hasMetric = /\d+%|\d+\s?(users|ms|x|hours|weeks)/i.test(a);
-  const hasSTAR = /(situation|task|action|result)/i.test(a);
+// ===== Feedback engine =====
+// Independent per-metric evaluators. Every "Try next time" tip is derived
+// from a gap that also pulled its metric down — coaching and scores cannot
+// contradict each other.
 
-  const clarity = clamp(40 + Math.min(wc, 120) * 0.4 + (a.includes(",") ? 5 : 0));
-  const structure = clamp(45 + (hasStructure ? 25 : 0) + (hasSTAR ? 15 : 0) + Math.min(wc, 80) * 0.1);
-  const confidence = clamp(
-    55 + (wc > 40 ? 15 : 0) - (/(maybe|i think|kinda|sort of|i guess)/i.test(a) ? 15 : 0),
-  );
-  const relevance = clamp(
-    50 + (overlap(question, a) * 30) + (hasMetric ? 10 : 0),
-  );
+const HEDGE_RE = /\b(i think|i guess|maybe|kinda|kind of|sort of|probably|might|perhaps)\b/gi;
+const FILLER_RE = /\b(um|uh|like|you know|basically|literally|actually|stuff|things)\b/gi;
+const OWNERSHIP_RE = /\b(i (led|built|owned|shipped|decided|drove|designed|architected|delivered|launched|created|ran|managed))\b/gi;
+const PASSIVE_RE = /\b(was|were)\s+\w+ed\b/gi;
+const METRIC_RE = /(\d+\s?%|\d+x|\d+\s?(users|customers|ms|seconds|minutes|hours|days|weeks|months|k|m|bn|dollars|\$))/gi;
+const CONNECTOR_RE = /\b(first|second|then|next|after that|finally|because|so that|as a result|therefore)\b/gi;
+
+const SITUATION_RE = /\b(last (quarter|year|month|week)|at my|when i was|the team was|we were|context was|background)\b/i;
+const TASK_RE = /\b(my (job|task|goal|role) was|i was asked|i needed to|owned|responsible for|the goal was)\b/i;
+const ACTION_RE = /\b(i (led|built|shipped|decided|drove|designed|ran|created|proposed|coordinated|split|paired|scoped|prioritized|refactored|debugged))\b/i;
+const RESULT_RE = /\b(as a result|the result|we shipped|we launched|we hit|we grew|we cut|we reduced|we improved|impact was|ended up|outcome)\b/i;
+
+type SentenceInfo = { text: string; start: number; end: number };
+
+function splitSentences(text: string): SentenceInfo[] {
+  const out: SentenceInfo[] = [];
+  const re = /[^.!?]+[.!?]?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const raw = m[0];
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const start = m.index + raw.indexOf(trimmed);
+    out.push({ text: trimmed, start, end: start + trimmed.length });
+  }
+  return out;
+}
+
+function countMatches(re: RegExp, text: string): number {
+  const m = text.match(re);
+  return m ? m.length : 0;
+}
+
+// Detect question type
+function questionType(question: string): "behavioral" | "technical" | "opinion" {
+  if (/tell me|describe|share|time you|walk me through a time|proud of|failed|disagreed|conflict|handled/i.test(question)) return "behavioral";
+  if (/design|architect|debug|scale|explain|database|sql|system|implement|complexity|reduce|measure|estimate|a\/b/i.test(question)) return "technical";
+  return "opinion";
+}
+
+// ----- Per-metric evaluators -----
+
+type Eval = { score: number; wins: string[]; gaps: { tag: string; tip: string }[] };
+
+function evalClarity(answer: string, sentences: SentenceInfo[]): Eval {
+  const wins: string[] = [];
+  const gaps: { tag: string; tip: string }[] = [];
+  const wc = answer.split(/\s+/).filter(Boolean).length;
+  const sc = Math.max(sentences.length, 1);
+  const avgLen = wc / sc;
+
+  let score = 70;
+  if (avgLen > 28) {
+    score -= 20;
+    gaps.push({ tag: "Long sentences", tip: `Your sentences average ${Math.round(avgLen)} words — break them up at natural pauses so each idea lands on its own.` });
+  } else if (avgLen < 5 && sc > 2) {
+    score -= 10;
+    gaps.push({ tag: "Choppy phrasing", tip: "Your sentences are very short — try connecting related ideas so the answer flows." });
+  } else {
+    score += 8;
+    wins.push("Sentence length is easy to follow — one idea per sentence.");
+  }
+
+  const fillers = countMatches(FILLER_RE, answer);
+  if (fillers >= 3) {
+    score -= 15;
+    gaps.push({ tag: "Filler words", tip: `You used ${fillers} filler words (like/basically/stuff). Cut them — they dilute otherwise strong points.` });
+  } else if (fillers === 0) {
+    score += 5;
+    wins.push("No filler words — every sentence carries weight.");
+  }
+
+  // Specificity: proper nouns or numbers
+  const proper = (answer.match(/\b[A-Z][a-z]{2,}\b/g) ?? []).length;
+  const numbers = countMatches(METRIC_RE, answer);
+  if (proper + numbers >= 2) {
+    score += 8;
+    wins.push("Concrete details (names, numbers) make this feel real, not rehearsed.");
+  } else {
+    gaps.push({ tag: "Vague specifics", tip: "Name a specific tool, team, or number. Concrete details make the answer memorable." });
+    score -= 5;
+  }
+
+  return { score: clamp(score), wins, gaps };
+}
+
+function evalConfidence(answer: string): Eval {
+  const wins: string[] = [];
+  const gaps: { tag: string; tip: string }[] = [];
+  let score = 70;
+
+  const hedges = countMatches(HEDGE_RE, answer);
+  const ownership = countMatches(OWNERSHIP_RE, answer);
+  const passives = countMatches(PASSIVE_RE, answer);
+
+  if (hedges >= 2) {
+    score -= 20;
+    gaps.push({ tag: "Hedging language", tip: `You hedged ${hedges} times ("I think", "maybe"). Replace with decisive verbs — "I decided", "I led" — to sound in-command.` });
+  } else if (hedges === 1) {
+    score -= 8;
+    gaps.push({ tag: "One hedge", tip: 'You said "I think" once — swap it for "I know" or drop the qualifier entirely.' });
+  }
+
+  if (ownership >= 2) {
+    score += 15;
+    wins.push("Strong ownership language — 'I led', 'I shipped' — you clearly own the story.");
+  } else if (ownership === 0) {
+    score -= 10;
+    gaps.push({ tag: "No ownership verbs", tip: "You never said what YOU did. Use \"I led / I built / I decided\" to claim your part." });
+  }
+
+  if (passives >= 2) {
+    score -= 10;
+    gaps.push({ tag: "Passive voice", tip: 'Rewrite passives ("was decided", "were built") in active voice so it\'s clear who acted.' });
+  }
+
+  return { score: clamp(score), wins, gaps };
+}
+
+function evalRelevance(question: string, answer: string): Eval {
+  const wins: string[] = [];
+  const gaps: { tag: string; tip: string }[] = [];
+  let score = 50;
+
+  const o = overlap(question, answer);
+  score += Math.round(o * 40);
+
+  const qt = questionType(question);
+  const hasMetric = METRIC_RE.test(answer);
+  METRIC_RE.lastIndex = 0;
+
+  if (o < 0.15) {
+    score -= 15;
+    gaps.push({ tag: "Drifts from question", tip: "Your answer doesn't repeat any of the key nouns from the question. Restate the question in your first sentence to anchor the response." });
+  } else if (o >= 0.4) {
+    wins.push("Directly addresses the question — no wandering.");
+    score += 5;
+  }
+
+  if (qt === "technical" && /measure|metric|kpi|success/i.test(question) && !hasMetric) {
+    score -= 10;
+    gaps.push({ tag: "Missing metric", tip: "The question asks how you'd measure success — name a concrete metric (conversion %, DAU, latency ms)." });
+  }
+
+  const wc = answer.split(/\s+/).filter(Boolean).length;
+  if (wc > 120 && o < 0.25) {
+    score -= 10;
+    gaps.push({ tag: "Tangential", tip: "Long answer, low overlap with the question — trim the setup and get to the answer sooner." });
+  }
+
+  return { score: clamp(score), wins, gaps };
+}
+
+function evalStructure(question: string, answer: string, sentences: SentenceInfo[]): Eval {
+  const wins: string[] = [];
+  const gaps: { tag: string; tip: string }[] = [];
+  const qt = questionType(question);
+
+  if (qt === "behavioral") {
+    const s = SITUATION_RE.test(answer);
+    const t = TASK_RE.test(answer);
+    const a = ACTION_RE.test(answer);
+    const r = RESULT_RE.test(answer) || METRIC_RE.test(answer);
+    METRIC_RE.lastIndex = 0;
+    const present = [s, t, a, r].filter(Boolean).length;
+
+    let score = 25 + present * 15; // 0→25, 4→85
+
+    const missing: string[] = [];
+    if (!s) missing.push("Situation");
+    if (!t) missing.push("Task");
+    if (!a) missing.push("Action");
+    if (!r) missing.push("Result");
+
+    if (present === 4) {
+      score += 8;
+      wins.push("Full STAR structure — Situation, Task, Action, and Result all present.");
+    }
+    if (present === 3 && !r) {
+      score = Math.min(score, 60);
+      gaps.push({ tag: "No result", tip: "You described the Situation and Action but skipped the Result — say what changed after you shipped (metric, outcome, decision)." });
+    } else if (missing.length === 1) {
+      gaps.push({ tag: `Missing ${missing[0]}`, tip: `You're one piece short: name the ${missing[0]} in one sentence to complete the STAR arc.` });
+    } else if (missing.length >= 2) {
+      score = Math.min(score, 50);
+      gaps.push({ tag: "Incomplete STAR", tip: `Your answer jumps into ${a ? "Action" : "the middle"} — set up ${missing.slice(0, 2).join(" and ")} first (one sentence each).` });
+    }
+
+    return { score: clamp(score), wins, gaps };
+  }
+
+  if (qt === "technical") {
+    const connectors = countMatches(CONNECTOR_RE, answer);
+    const tradeoff = /trade.?off|however|but|downside|drawback|instead|versus|vs\./i.test(answer);
+    const constraints = /constraint|assume|scale|latency|throughput|read|write|budget/i.test(answer);
+
+    let score = 50;
+    if (constraints) { score += 15; wins.push("You set constraints up front — a senior habit."); }
+    else gaps.push({ tag: "No constraints", tip: "Open with the constraints you're solving for (scale, latency, read/write ratio) before proposing a design." });
+
+    if (connectors >= 2) { score += 10; wins.push("Clear step-by-step sequencing (first / then / finally)."); }
+    else gaps.push({ tag: "No sequencing", tip: 'Signpost your steps — "First… then… finally…" — so the interviewer can follow the logic.' });
+
+    if (tradeoff) { score += 15; wins.push("Named a trade-off — shows you weighed alternatives, not just picked one."); }
+    else gaps.push({ tag: "No trade-off", tip: "End with a trade-off: what would you give up for this design, and why is that the right call here?" });
+
+    return { score: clamp(score), wins, gaps };
+  }
+
+  // opinion / general
+  const connectors = countMatches(CONNECTOR_RE, answer);
+  let score = 55 + (connectors >= 2 ? 15 : 0) + (sentences.length >= 3 ? 10 : 0);
+  if (connectors >= 2) wins.push("Logical connectors make the argument easy to follow.");
+  else gaps.push({ tag: "No sequencing", tip: 'Use "first / because / so" to signal the shape of your argument.' });
+  return { score: clamp(score), wins, gaps };
+}
+
+// ----- Spans (in-answer highlights) -----
+
+function buildSpans(answer: string, sentences: SentenceInfo[]): HighlightSpan[] {
+  const spans: HighlightSpan[] = [];
+  for (const s of sentences) {
+    const t = s.text;
+    const hasHedge = HEDGE_RE.test(t); HEDGE_RE.lastIndex = 0;
+    const hasFiller = FILLER_RE.test(t); FILLER_RE.lastIndex = 0;
+    const hasOwnership = OWNERSHIP_RE.test(t); OWNERSHIP_RE.lastIndex = 0;
+    const hasMetric = METRIC_RE.test(t); METRIC_RE.lastIndex = 0;
+    const hasResult = RESULT_RE.test(t);
+    const hasAction = ACTION_RE.test(t);
+
+    if (hasMetric || hasResult || (hasOwnership && t.split(/\s+/).length > 8)) {
+      spans.push({ start: s.start, end: s.end, type: "strong", tip: hasMetric ? "Concrete number — this is what makes answers memorable." : hasResult ? "Named the outcome — the interviewer now knows what changed." : "Strong ownership — 'I' + action verb makes your role clear." });
+    } else if (hasHedge || hasFiller) {
+      spans.push({ start: s.start, end: s.end, type: "vague", tip: hasHedge ? 'Hedging weakens this sentence. Try "I decided" instead of "I think we should".' : "Filler words (like/basically/stuff) dilute the point — cut them and the sentence gets stronger." });
+    } else if (hasAction && !hasMetric && !hasResult) {
+      // Action described but no outcome nearby
+      spans.push({ start: s.start, end: s.end, type: "missing-impact", tip: "You described what you did but not the impact. Add one sentence: what changed after this?" });
+    }
+  }
+  return spans;
+}
+
+// ----- Main entry -----
+
+export function scoreAnswer(question: string, answer: string): QA {
+  const a = answer.trim();
+  const words = a.split(/\s+/).filter(Boolean);
+  const wc = words.length;
+
+  const isGeneric = /^(ok(ay)?|yes|yeah|yep|no|nope|nah|sure|maybe|idk|dunno|n\/a|na|none|nothing)[.!?\s]*$/i.test(a);
+  if (a.length < 12 || isGeneric) {
+    const tooShortMsg =
+      "It looks like your answer is too short. Try giving a more detailed response so I can provide meaningful feedback.";
+    const lowMetrics: Metric = { clarity: 20, structure: 20, confidence: 20, relevance: 20 };
+    return {
+      id: crypto.randomUUID(),
+      question,
+      answer: a,
+      difficulty: "medium",
+      feedback: tooShortMsg,
+      highlight: tooShortMsg,
+      improve: "",
+      metrics: lowMetrics,
+      improvedAnswer: "",
+      howToImprove: [],
+      missing: [],
+      worked: [],
+      tryNext: [],
+      spans: [],
+      tooShort: true,
+    };
+  }
+
+  const sentences = splitSentences(a);
+
+  const clarity = evalClarity(a, sentences);
+  const confidence = evalConfidence(a);
+  const relevance = evalRelevance(question, a);
+  const structure = evalStructure(question, a, sentences);
 
   const metrics: Metric = {
-    clarity: Math.round(clarity),
-    structure: Math.round(structure),
-    confidence: Math.round(confidence),
-    relevance: Math.round(relevance),
+    clarity: Math.round(clarity.score),
+    structure: Math.round(structure.score),
+    confidence: Math.round(confidence.score),
+    relevance: Math.round(relevance.score),
   };
 
-  const avg = (metrics.clarity + metrics.structure + metrics.confidence + metrics.relevance) / 4;
-  const opener =
-    avg >= 80
-      ? "Really strong answer — this is interview-ready. "
-      : avg >= 65
-        ? "You're on the right track. "
-        : avg >= 50
-          ? "Good start, but let's sharpen this. "
-          : "Solid attempt — let's build on it together. ";
-
-  const highlightCore =
-    hasMetric
-      ? "Strong use of concrete numbers — that lands."
-      : hasStructure
-        ? "Nice logical flow, easy to follow."
-        : wc > 60
-          ? "Good depth in your reasoning."
-          : "Clear and direct — no fluff.";
-  const highlight = opener + highlightCore;
-
-  const improve =
-    !hasSTAR && /tell me|describe|share/i.test(question)
-      ? "Try the STAR format: Situation → Task → Action → Result."
-      : !hasMetric
-        ? "Anchor your impact with a number (%, users, time saved)."
-        : wc < 40
-          ? "Stretch the answer — add one specific example."
-          : "Trim filler words like 'kinda' and 'I think' to sound more decisive.";
-
-  const feedback = `${highlight} ${improve}`;
-
-  // Missing element tags
+  // Aggregate coaching — never mix worked with gaps
+  const worked: string[] = [];
+  const tryNext: string[] = [];
   const missing: string[] = [];
-  if (!hasMetric) missing.push("Missing metric");
-  if (!hasStructure && !hasSTAR) missing.push("No clear structure");
-  if (wc < 40) missing.push("Lacks depth");
-  if (overlap(question, a) < 0.15) missing.push("Drifts from question");
-  if (/(maybe|i think|kinda|sort of|i guess)/i.test(a)) missing.push("Hedging language");
 
-  // How to improve — actionable bullets
-  const howToImprove: string[] = [];
-  if (!hasSTAR && /tell me|describe|share/i.test(question)) {
-    howToImprove.push("Structure your answer using the STAR method (Situation → Task → Action → Result).");
-  }
-  if (!hasMetric) howToImprove.push("Add a specific metric — %, users impacted, time saved, revenue.");
-  if (wc < 40) howToImprove.push("Add one concrete example to ground the answer.");
-  if (wc > 180) howToImprove.push("Be more concise — aim for 90–120 words.");
-  if (/(maybe|i think|kinda|sort of|i guess)/i.test(a)) {
-    howToImprove.push("Replace hedges ('I think', 'kinda') with ownership verbs ('I led', 'I shipped').");
-  }
-  if (!howToImprove.length) howToImprove.push("Practice this answer out loud once — pacing is your last 10%.");
+  // Only include a "worked" line when the metric actually scored well
+  const gate = 75;
+  if (metrics.clarity >= gate) worked.push(...clarity.wins);
+  if (metrics.confidence >= gate) worked.push(...confidence.wins);
+  if (metrics.relevance >= gate) worked.push(...relevance.wins);
+  if (metrics.structure >= gate) worked.push(...structure.wins);
 
-  const improvedAnswer = buildImprovedAnswer(question, a);
+  // Gaps drive both tryNext copy and the short missing tags
+  for (const g of [...structure.gaps, ...relevance.gaps, ...confidence.gaps, ...clarity.gaps]) {
+    tryNext.push(g.tip);
+    missing.push(g.tag);
+  }
+
+  // Fallbacks
+  if (!worked.length) {
+    if (wc > 30) worked.push("You gave the question a real attempt — enough substance to coach against.");
+    else worked.push("You stayed on topic — that's the foundation.");
+  }
+  if (!tryNext.length) tryNext.push("Practice this answer out loud once — pacing is your last 10%.");
+
+  // Cap to keep the card scannable
+  const workedTop = worked.slice(0, 3);
+  const tryNextTop = tryNext.slice(0, 3);
+  const missingTop = Array.from(new Set(missing)).slice(0, 4);
+
+  const spans = buildSpans(a, sentences);
+
+  // Legacy joined strings for older consumers (dashboard/scorecard summaries)
+  const highlight = workedTop[0] ?? "";
+  const improve = tryNextTop[0] ?? "";
+  const feedback = `${highlight} ${improve}`.trim();
 
   return {
     id: crypto.randomUUID(),
@@ -377,38 +632,13 @@ export function scoreAnswer(question: string, answer: string): QA {
     highlight,
     improve,
     metrics,
-    improvedAnswer,
-    howToImprove,
-    missing,
+    improvedAnswer: "",
+    howToImprove: tryNextTop,
+    missing: missingTop,
+    worked: workedTop,
+    tryNext: tryNextTop,
+    spans,
   };
-}
-
-function buildImprovedAnswer(question: string, answer: string): string {
-  const isBehavioral = /tell me|describe|share|time you|proud of|failed|disagreed|prioritize/i.test(question);
-  const isTechnical = /design|architect|debug|scale|reduce|explain|database|sql|system/i.test(question);
-  const seed = answer.split(/[.!?]/)[0]?.trim().slice(0, 90) || "a recent project I led";
-
-  if (isBehavioral) {
-    return [
-      `Situation — Last quarter, ${seed.toLowerCase()}; the team was blocked and the deadline was two weeks out.`,
-      `Task — I owned unblocking us without slipping the date.`,
-      `Action — I split the work into three tracks, paired with engineering daily, and cut scope on the lowest-impact piece.`,
-      `Result — We shipped on time, cut the bug rate by 40%, and the pattern became our default for the next two launches.`,
-    ].join(" ");
-  }
-  if (isTechnical) {
-    return [
-      `First, I'd clarify constraints — read/write ratio, expected scale, latency budget.`,
-      `Then the core path: an API in front of a primary store, with a cache for hot reads.`,
-      `For scale, shard by user_id, push static assets to a CDN, and queue writes async — that gets us under 100ms p95 in similar systems.`,
-      `Trade-off: stronger consistency would cost ~30ms; for this use case, eventual is the right call.`,
-    ].join(" ");
-  }
-  return [
-    `Short version: ${seed}.`,
-    `What made it work was a clear hypothesis up front and one metric we agreed to move.`,
-    `In six weeks we lifted that metric by 25% — and the team kept using the process long after.`,
-  ].join(" ");
 }
 
 
