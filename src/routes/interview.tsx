@@ -216,10 +216,14 @@ function Interview() {
               );
             }
             if (t.kind === "user-answer") {
+              // Find matching feedback (next feedback turn) to source spans
+              const fb = turns.slice(i + 1).find((x) => x.kind === "ai-feedback") as
+                | { kind: "ai-feedback"; qa: QA }
+                | undefined;
               return (
                 <div key={i} className="flex justify-end">
                   <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-foreground text-background px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
-                    {t.text}
+                    <HighlightedAnswer text={t.text} spans={fb?.qa.spans ?? []} />
                   </div>
                 </div>
               );
