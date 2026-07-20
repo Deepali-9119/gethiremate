@@ -1,60 +1,81 @@
+## Goal
 
-## Onboarding flow improvements
+Rebuild the feedback engine so scores, written coaching, and in-answer highlights all reflect the same measurable signals — and so "What worked" never contradicts "Try next time".
 
-Keep the existing chat UI, chip styling, typing bubbles, and step layout. All changes are logic + copy tweaks inside `src/routes/onboarding.tsx`, with a small addition to `src/lib/hiremate.ts` for the expanded Company type.
+## 1. Rewrite scoring in `src/lib/hiremate.ts`
 
-### 1. Fix duplicate skip acknowledgements
+Replace `scoreAnswer` with independent per-metric evaluators. Each returns `{ score, signals, gaps }` used later for coaching and highlights.
 
-Root cause: `skipRole` says an ack message, then calls `goReady(true)` which fires a second `sayAi` bubble a moment later. Same double-bubble pattern exists in `skipLevel` (ack + follow-up question) and `skipCompany`/`skipDate` (ack + summary).
+**Clarity** — sentence readability + specificity
+- Avg sentence length (penalize > 28 words or < 5)
+- Filler words (`um`, `like`, `you know`, `basically`, `stuff`, `things`)
+- Concrete nouns/proper nouns ratio (specificity signal)
 
-Fix: consolidate each skip path to exactly one AI bubble that both acknowledges and moves the flow forward.
+**Confidence** — decisive language + ownership, no hesitation
+- Hedges (`I think`, `maybe`, `kinda`, `sort of`, `I guess`, `probably`) lower score
+- Ownership verbs (`I led`, `I built`, `I decided`, `I owned`, `I shipped`) raise score
+- Passive voice ("was done", "were made") lowers score
 
-- **Skip role** → single bubble: *"No problem 👍 I'll run a well-rounded interview suitable for most roles."*, then jump straight to the interview summary (`ready` step) — no separate `goReady` bubble.
-- **Skip level** → single bubble that acks and asks the next question in one message: *"Got it 👍 I'll keep the difficulty balanced. Any specific company you're targeting, or just general practice?"*
-- **Skip company** → single bubble that transitions to the date step: *"No worries 👍 I'll keep it broad. Last thing — when's your interview? (optional)"*
-- **Skip date** → single bubble that leads into the summary: *"All good — you can add it later from the dashboard."* followed only by the ready-summary bubble (that's the intended two-message sequence: ack + summary of what's coming; verify it doesn't double-fire).
+**Relevance** — directly answers, no tangents
+- Keyword overlap with question (existing `overlap` helper)
+- Question-type match: "how would you measure" expects metric words; "walk me through" expects sequencing; "tell me about a time" expects past-tense narrative
+- Penalize obvious tangents (long answer, low overlap)
 
-Refactor `goReady` so it never emits its own ack — callers own the ack copy. `goReady` just emits the "here's what's coming" summary once.
+**Structure** — STAR + logical progression + completeness (for behavioral); step sequencing + trade-offs (for technical)
+- Detect each STAR component separately: Situation, Task, Action, Result — count how many present (0–4)
+- Detect logical connectors (`first`, `then`, `next`, `finally`, `because`, `so`)
+- For technical questions, look for constraint-setting → approach → trade-off pattern
+- Score is proportional to completeness — missing Result caps Structure at ~60; missing 2+ components caps at ~45
 
-### 2. Personalization microcopy
+**Guarantee consistency:** if `howToImprove` mentions STAR, Structure must be ≤ 65. Add an assertion in dev that any tip generated has a corresponding low sub-metric.
 
-Prepend a short framing line to the existing question in each transition bubble:
+## 2. Rewrite feedback text
 
-- Before **experience level** question (in `pickRole` / `submitOther`): *"We'll adjust question difficulty based on your experience. How much experience do you have?"* (replaces the current "How much experience do you have?" tail).
-- Before **company** question (in `pickLevel`): *"If you're preparing for a specific company we'll tailor questions accordingly. Any specific company in mind, or just general practice?"*
+Split into three arrays, populated only from the evaluator outputs:
 
-### 3. Role selection — chips + searchable input
+- `worked: string[]` — one line per metric whose score ≥ 75, describing the specific signal that landed ("You named the Result clearly — a 40% drop in bug rate."). Never contains criticism.
+- `tryNext: string[]` — every improvement lives here, sourced from each metric's `gaps`. Precise, references what the user actually said or omitted:
+  - Instead of "Add more detail" → "You described the Situation and Action but skipped the Result — say what changed after you shipped."
+  - Instead of "Use STAR" → "Your answer jumps straight to Action. Set the Situation in one sentence first (when, where, who)."
+- `missing: string[]` — short tags derived from the same gaps ("No result", "Missing metric", "Hedging language").
 
-Keep the current chip grid. Add a search input above/below the chips (same step, no new step) with placeholder *"Search your role..."*.
+Drop the old `highlight` / `improve` single-string fields from the render path; keep them as computed joins for backwards compatibility with dashboard/scorecard until those are updated.
 
-- Expand `ROLE_OPTIONS` to: Product Manager, Software Engineer, Business Analyst, Marketing, Consultant, Designer, Sales, Finance, Teacher, Customer Success, HR.
-- As the user types, filter chips live against the list.
-- If the query doesn't match any chip, show a single "Use '<query>' as your role →" affordance that submits the custom role (reuses `submitOther` logic path). This removes the need for the separate `roleOther` step, but keep the "Other" chip as a fallback that focuses the search input.
-- Hitting Enter in the search input with a non-empty value submits as a custom role.
+## 3. In-answer highlights
 
-### 4. Company selection — expanded chips + freeform
+Extend `QA` with `spans: { start: number; end: number; type: 'strong' | 'vague' | 'missing-impact'; tip: string }[]`.
 
-Replace `COMPANY_OPTIONS` with: Google, Amazon, Microsoft, Meta, Apple, Netflix, Startup, General Practice, Other.
+Generate spans during scoring:
+- **Green `strong`** — sentence containing a metric, ownership verb, or a fully-formed STAR Result
+- **Yellow `vague`** — sentence with hedges or generic fillers ("some stuff", "kinda", "I think")
+- **Blue `missing-impact`** — sentence that describes Action but no measurable outcome follows
 
-- All named big-tech companies map to `Company: "Big Tech"`; Startup → `"Startup"`; General Practice → `"General"`; Other → opens a small inline text input (mirrors role search pattern) that accepts any company name.
-- Because `Company` is a fixed union today, extend it in `src/lib/hiremate.ts`:
-  - Add an optional `companyName?: string` field on `Profile` to store the display label (e.g. "Netflix", "Acme Corp"), while `company` keeps the bucketed value used by scoring/logic.
-  - No behavior change downstream — existing consumers keep reading `company`.
+Each span carries a `tip` string used in the tap-to-explain popover.
 
-### 5. Optional interview date
+Render in `src/routes/interview.tsx` inside the user-answer bubble: replace the plain `{t.text}` with a `<HighlightedAnswer>` component that splits the answer by spans and wraps each in a `<Popover>` (shadcn) with a colored underline (`decoration-warn`, `decoration-info`, `decoration-success`). Tap/click opens the tip.
 
-The `date` step already exists. Two adjustments:
+## 4. Update feedback card UI
 
-- Reach it from every path (currently `skipCompany` skips it — route the skip-company path through the date step instead, per fix #1 above).
-- Keep the skip link copy as-is (already stores nothing when skipped). Confirm the picked date persists to `Profile.interviewDate` (already wired via `saveProfile`).
+In `src/routes/interview.tsx`:
+- Render `worked` bullets under a green "What worked" header (only genuine strengths).
+- Render `tryNext` bullets under a coral "Try next time" header. Remove the old separate "How to improve" section — it collapses into `tryNext`.
+- Keep `missing` chips and the 4 MetricBars unchanged.
+- Drop `t.qa.highlight` / `t.qa.improve` paragraphs.
 
-### Files touched
+## 5. Keep consumers working
 
-- `src/routes/onboarding.tsx` — all of the above (state, handlers, chips, search input, microcopy, dedupe).
-- `src/lib/hiremate.ts` — add optional `companyName` to `Profile` type.
+- `aggregate`, `weakAreas`, dashboard, scorecard read only `metrics` — untouched.
+- `src/lib/mcp/tools/score-answer.ts` — update the `summary` text to join `worked` + `tryNext` instead of `highlight` + `improve`, and expose `worked`, `tryNext`, `spans` in `structuredContent`.
+- `src/lib/sessions.ts` `summarizeQAs` — swap `highlight`/`improve` for `worked[0]`/`tryNext[0]`.
 
-### Out of scope
+## Technical notes
 
-- No visual redesign: reuse `Chip`, `ChipGrid`, `StepBlock`, `SkipLink`, bubbles, typing indicator.
-- No changes to interview engine, scoring, or dashboard.
-- No new routes.
+- Behavioral question detection: `/tell me|describe|share|time you|walk me through a time|proud of|failed|disagreed/i`
+- Technical question detection: `/design|architect|debug|scale|explain|database|sql|system|implement|complexity/i`
+- Sentence split: `answer.split(/(?<=[.!?])\s+/)` with index tracking for span offsets.
+- Span offset tracking: iterate sentences with a running cursor so `{start,end}` map to the original string.
+- Keep `clamp(20, 98)` bounds.
+
+## Out of scope
+
+No changes to onboarding, dashboard visuals, scorecard visuals, or the MCP route infrastructure. `improvedAnswer` field stays in the type but is no longer rendered (already removed earlier).

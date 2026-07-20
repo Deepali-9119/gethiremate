@@ -43,19 +43,11 @@ export function summarizeQAs(qas: QA[]): { strengths: string[]; improvements: st
   const seenI = new Set<string>();
 
   for (const qa of qas) {
-    if (qa.highlight && !seenS.has(qa.highlight)) {
-      seenS.add(qa.highlight);
-      strengths.push(qa.highlight);
+    for (const w of qa.worked ?? []) {
+      if (w && !seenS.has(w)) { seenS.add(w); strengths.push(w); }
     }
-    for (const tip of qa.howToImprove ?? []) {
-      if (tip && !seenI.has(tip)) {
-        seenI.add(tip);
-        improvements.push(tip);
-      }
-    }
-    if (qa.improve && !seenI.has(qa.improve)) {
-      seenI.add(qa.improve);
-      improvements.push(qa.improve);
+    for (const tip of qa.tryNext ?? qa.howToImprove ?? []) {
+      if (tip && !seenI.has(tip)) { seenI.add(tip); improvements.push(tip); }
     }
   }
 

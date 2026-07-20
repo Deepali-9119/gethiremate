@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   aggregate,
   generateQuestion,
@@ -11,9 +11,11 @@ import {
   type Interview,
   type QA,
 } from "@/lib/hiremate";
+import type { HighlightSpan } from "@/lib/hiremate";
 import { appendSession, summarizeQAs } from "@/lib/sessions";
 import { MetricBar } from "@/components/MetricBar";
-import { ArrowRight, Send, Sparkles, Flag, RotateCcw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ArrowRight, Send, Sparkles, Flag, RotateCcw, Check, AlertTriangle, Info } from "lucide-react";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
@@ -216,10 +218,14 @@ function Interview() {
               );
             }
             if (t.kind === "user-answer") {
+              // Find matching feedback (next feedback turn) to source spans
+              const fb = turns.slice(i + 1).find((x) => x.kind === "ai-feedback") as
+                | { kind: "ai-feedback"; qa: QA }
+                | undefined;
               return (
                 <div key={i} className="flex justify-end">
                   <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-foreground text-background px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap">
-                    {t.text}
+                    <HighlightedAnswer text={t.text} spans={fb?.qa.spans ?? []} />
                   </div>
                 </div>
               );
@@ -259,14 +265,37 @@ function Interview() {
                     </p>
                   ) : (
                     <>
-                      <p className="text-sm mb-1">
-                        <span className="text-success font-medium">What worked: </span>
-                        {t.qa.highlight}
-                      </p>
-                      <p className="text-sm mb-3">
-                        <span className="text-coral font-medium">Try next time: </span>
-                        {t.qa.improve}
-                      </p>
+                      {t.qa.worked.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs uppercase tracking-wider text-success mb-2 font-medium">
+                            What worked
+                          </p>
+                          <ul className="space-y-1.5">
+                            {t.qa.worked.map((w, idx) => (
+                              <li key={idx} className="text-sm flex gap-2">
+                                <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+                                <span className="leading-relaxed">{w}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {t.qa.tryNext.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs uppercase tracking-wider text-coral mb-2 font-medium">
+                            Try next time
+                          </p>
+                          <ul className="space-y-1.5">
+                            {t.qa.tryNext.map((tip, idx) => (
+                              <li key={idx} className="text-sm flex gap-2">
+                                <ArrowRight className="h-3.5 w-3.5 text-coral shrink-0 mt-0.5" />
+                                <span className="leading-relaxed">{tip}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
 
                       {t.qa.missing.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-4">
@@ -281,19 +310,14 @@ function Interview() {
                         </div>
                       )}
 
-                      <div className="mb-4">
-                        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                          How to improve
+                      {t.qa.spans.length > 0 && (
+                        <p className="text-xs text-muted-foreground mb-4 flex items-center gap-3 flex-wrap">
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-success" /> Strong</span>
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-warn" /> Vague</span>
+                          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-info" /> Missing impact</span>
+                          <span className="opacity-70">— tap a highlighted line in your answer for the fix.</span>
                         </p>
-                        <ul className="space-y-1.5">
-                          {t.qa.howToImprove.map((tip, idx) => (
-                            <li key={idx} className="text-sm flex gap-2">
-                              <span className="text-coral mt-1.5 h-1 w-1 rounded-full bg-coral shrink-0" />
-                              <span className="leading-relaxed">{tip}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      )}
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-border/60">
                         <MetricBar label="Clarity" value={m.clarity} />
@@ -415,3 +439,38 @@ function Dot({ delay = 0 }: { delay?: number }) {
   );
 }
 
+
+function HighlightedAnswer({ text, spans }: { text: string; spans: HighlightSpan[] }) {
+  if (!spans.length) return <>{text}</>;
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  sorted.forEach((s, i) => {
+    if (s.start > cursor) parts.push(<span key={`t-${i}`}>{text.slice(cursor, s.start)}</span>);
+    const chunk = text.slice(s.start, s.end);
+    const styles =
+      s.type === "strong"
+        ? "underline decoration-2 decoration-success/80 underline-offset-4"
+        : s.type === "vague"
+          ? "underline decoration-2 decoration-warn underline-offset-4 bg-warn/10 rounded px-0.5"
+          : "underline decoration-2 decoration-info underline-offset-4 bg-info/10 rounded px-0.5";
+    const Icon = s.type === "strong" ? Check : s.type === "vague" ? AlertTriangle : Info;
+    const iconTone = s.type === "strong" ? "text-success" : s.type === "vague" ? "text-warn" : "text-info";
+    parts.push(
+      <Popover key={`s-${i}`}>
+        <PopoverTrigger asChild>
+          <button className={`${styles} text-left cursor-pointer`}>{chunk}</button>
+        </PopoverTrigger>
+        <PopoverContent side="top" className="w-72 text-xs leading-relaxed">
+          <div className="flex gap-2 items-start">
+            <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${iconTone}`} />
+            <p className="text-ink">{s.tip}</p>
+          </div>
+        </PopoverContent>
+      </Popover>,
+    );
+    cursor = s.end;
+  });
+  if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
+  return <>{parts}</>;
+}
