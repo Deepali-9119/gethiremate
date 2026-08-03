@@ -703,6 +703,8 @@ export function scoreAnswer(question: string, answer: string): QA {
   const missingTop = Array.from(new Set(missing)).slice(0, 4);
 
   const spans = buildSpans(a, sentences);
+  const star = buildStarRewrite(question, a, sentences);
+
 
   // Legacy joined strings for older consumers (dashboard/scorecard summaries)
   const highlight = workedTop[0] ?? "";
