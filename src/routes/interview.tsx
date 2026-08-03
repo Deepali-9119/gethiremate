@@ -328,6 +328,8 @@ function Interview() {
                     </>
                   )}
 
+                  {!t.qa.tooShort && <StarCoaching qa={t.qa} />}
+
                   {isLatestFeedback && !thinking && (
                     <div className="mt-4 pt-4 border-t border-border/60 flex justify-end">
                       <button
@@ -338,6 +340,7 @@ function Interview() {
                       </button>
                     </div>
                   )}
+
                 </div>
               </div>
             );
