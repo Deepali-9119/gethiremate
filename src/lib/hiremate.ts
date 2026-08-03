@@ -36,6 +36,8 @@ export type QA = {
   improve: string;
   metrics: Metric;
   improvedAnswer: string;
+  star?: StarRewrite;
+
   howToImprove: string[];
   missing: string[];
   worked: string[];
