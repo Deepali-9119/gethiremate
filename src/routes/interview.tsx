@@ -15,7 +15,7 @@ import type { HighlightSpan } from "@/lib/hiremate";
 import { appendSession, summarizeQAs } from "@/lib/sessions";
 import { MetricBar } from "@/components/MetricBar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowRight, Send, Sparkles, Flag, RotateCcw, Check, AlertTriangle, Info } from "lucide-react";
+import { ArrowRight, Send, Sparkles, Flag, RotateCcw, Check, AlertTriangle, Info, Wand2, Columns2, Rows2 } from "lucide-react";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
@@ -328,6 +328,8 @@ function Interview() {
                     </>
                   )}
 
+                  {!t.qa.tooShort && <StarCoaching qa={t.qa} />}
+
                   {isLatestFeedback && !thinking && (
                     <div className="mt-4 pt-4 border-t border-border/60 flex justify-end">
                       <button
@@ -338,6 +340,7 @@ function Interview() {
                       </button>
                     </div>
                   )}
+
                 </div>
               </div>
             );
@@ -474,3 +477,117 @@ function HighlightedAnswer({ text, spans }: { text: string; spans: HighlightSpan
   if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
   return <>{parts}</>;
 }
+
+function StarText({ text }: { text: string }) {
+  // Bracketed segments are prompts for the candidate to fill in, not model prose.
+  const parts = text.split(/(\[[^\]]+\])/g).filter(Boolean);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith("[") ? (
+          <span key={i} className="rounded bg-coral-soft px-1 py-0.5 text-ink/80 italic">
+            {p}
+          </span>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function StarCoaching({ qa }: { qa: QA }) {
+  const [open, setOpen] = useState(false);
+  const [sideBySide, setSideBySide] = useState(false);
+  const star = qa.star;
+  if (!star) return null;
+
+  const rows: { label: string; letter: string; text: string }[] = [
+    { label: "Situation", letter: "S", text: star.situation },
+    { label: "Task", letter: "T", text: star.task },
+    { label: "Action", letter: "A", text: star.action },
+    { label: "Result", letter: "R", text: star.result },
+  ];
+
+  if (!open) {
+    return (
+      <div className="mt-4 pt-4 border-t border-border/60">
+        <button
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-full bg-ink text-background px-4 py-2 text-xs font-medium hover:opacity-90 transition"
+        >
+          <Wand2 className="h-3.5 w-3.5" /> Rewrite my answer using STAR
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-border/60 space-y-5">
+      {/* 3. Improved answer */}
+      <div>
+        <p className="text-xs uppercase tracking-wider text-info mb-2 font-medium">Improved answer (STAR)</p>
+        <div className="rounded-2xl bg-secondary/50 border border-border/60 p-4 space-y-2.5">
+          {rows.map((r) => (
+            <div key={r.letter} className="flex gap-2.5">
+              <span className="h-5 w-5 shrink-0 rounded-full bg-ink text-background text-[10px] font-semibold flex items-center justify-center mt-0.5">
+                {r.letter}
+              </span>
+              <p className="text-sm leading-relaxed">
+                <span className="text-muted-foreground">{r.label}: </span>
+                <StarText text={r.text} />
+              </p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+          This is an example for learning — not something to memorise. Keep your own story, borrow the shape.
+        </p>
+      </div>
+
+      {/* 4. Before vs after */}
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Before vs after</p>
+          <button
+            onClick={() => setSideBySide((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[11px] hover:bg-secondary transition"
+          >
+            {sideBySide ? <Rows2 className="h-3 w-3" /> : <Columns2 className="h-3 w-3" />}
+            {sideBySide ? "Stacked" : "Side by side"}
+          </button>
+        </div>
+
+        <div className={sideBySide ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 gap-3"}>
+          <div className="rounded-2xl border border-border/60 p-3.5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Original answer</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{qa.answer}</p>
+          </div>
+          <div className="rounded-2xl border border-success/40 bg-success/5 p-3.5">
+            <p className="text-[11px] uppercase tracking-wider text-success mb-1.5">Improved answer</p>
+            <p className="text-sm leading-relaxed">
+              <StarText text={star.improvedAnswer} />
+            </p>
+          </div>
+        </div>
+
+        <ul className="mt-3 space-y-1.5">
+          {star.changes.map((c, i) => (
+            <li key={i} className="text-xs flex gap-2 text-muted-foreground">
+              <Check className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{c}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <button
+        onClick={() => setOpen(false)}
+        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
+      >
+        Hide rewrite
+      </button>
+    </div>
+  );
+}
+
