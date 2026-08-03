@@ -514,6 +514,8 @@ function buildSpans(answer: string, sentences: SentenceInfo[]): HighlightSpan[] 
     }
   }
   return spans;
+}
+
 
 // ----- STAR rewrite (coaching example, built from the candidate's own words) -----
 
