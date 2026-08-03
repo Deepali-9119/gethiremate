@@ -718,7 +718,9 @@ export function scoreAnswer(question: string, answer: string): QA {
     highlight,
     improve,
     metrics,
-    improvedAnswer: "",
+    improvedAnswer: star.improvedAnswer,
+    star,
+
     howToImprove: tryNextTop,
     missing: missingTop,
     worked: workedTop,
