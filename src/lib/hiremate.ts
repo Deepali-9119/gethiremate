@@ -514,9 +514,116 @@ function buildSpans(answer: string, sentences: SentenceInfo[]): HighlightSpan[] 
     }
   }
   return spans;
+
+// ----- STAR rewrite (coaching example, built from the candidate's own words) -----
+
+export type StarRewrite = {
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  improvedAnswer: string;
+  changes: string[];
+  filledSlots: ("situation" | "task" | "action" | "result")[];
+};
+
+const HEDGE_STRIP_RE = /\b(i think that|i think|i guess|i mean|maybe|kinda|kind of|sort of|probably|perhaps)\b[,]?\s*/gi;
+const FILLER_STRIP_RE = /\b(um|uh|you know|basically|literally|actually)\b[,]?\s*/gi;
+
+function tidy(sentence: string): string {
+  let s = sentence
+    .replace(HEDGE_STRIP_RE, "")
+    .replace(FILLER_STRIP_RE, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[,;:\s]+/, "")
+    .trim();
+  if (!s) return "";
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+  if (!/[.!?]$/.test(s)) s += ".";
+  return s;
+}
+
+function joinTidy(list: string[]): string {
+  return list.map(tidy).filter(Boolean).join(" ");
+}
+
+export function buildStarRewrite(
+  question: string,
+  answer: string,
+  sentences: SentenceInfo[],
+): StarRewrite {
+  const buckets: Record<"situation" | "task" | "action" | "result", string[]> = {
+    situation: [],
+    task: [],
+    action: [],
+    result: [],
+  };
+
+  sentences.forEach((s, i) => {
+    const t = s.text;
+    METRIC_RE.lastIndex = 0;
+    const hasMetric = METRIC_RE.test(t);
+    METRIC_RE.lastIndex = 0;
+    if (RESULT_RE.test(t) || hasMetric) buckets.result.push(t);
+    else if (TASK_RE.test(t)) buckets.task.push(t);
+    else if (ACTION_RE.test(t) || /\bi\s+\w+ed\b/i.test(t)) buckets.action.push(t);
+    else if (SITUATION_RE.test(t) || i === 0) buckets.situation.push(t);
+    else buckets.action.push(t);
+  });
+
+  const filledSlots: StarRewrite["filledSlots"] = [];
+
+  let situation = joinTidy(buckets.situation);
+  if (!situation) {
+    situation = "[Set the scene in one line: where you were, when it happened, and why it mattered.]";
+    filledSlots.push("situation");
+  }
+
+  let task = joinTidy(buckets.task);
+  if (!task) {
+    task = "[Name what you were responsible for: the goal you owned and the constraint you faced.]";
+    filledSlots.push("task");
+  }
+
+  let action = joinTidy(buckets.action);
+  if (!action) {
+    action = "[Describe the two or three moves you personally made — start each with \"I\".]";
+    filledSlots.push("action");
+  }
+
+  let result = joinTidy(buckets.result);
+  METRIC_RE.lastIndex = 0;
+  const answerHasMetric = METRIC_RE.test(answer);
+  METRIC_RE.lastIndex = 0;
+  if (!result) {
+    result = "[Add the measurable outcome: %, time saved, revenue, or users affected — plus one line on what you learned.]";
+    filledSlots.push("result");
+  } else if (!answerHasMetric) {
+    result += " [Add one number here — %, hours saved, users affected — so the impact is undeniable.]";
+  }
+
+  const improvedAnswer = `${situation} ${task} ${action} ${result}`.replace(/\s{2,}/g, " ").trim();
+
+  // What actually changed between the original and the rewrite
+  const changes: string[] = [];
+  if (!answerHasMetric) changes.push("Added metrics — a number turns a story into evidence.");
+  if (filledSlots.length) changes.push("Improved structure — the answer now runs Situation → Task → Action → Result.");
+  if (!RESULT_RE.test(answer) || filledSlots.includes("result")) changes.push("Stronger impact — the answer now ends on the outcome, not the activity.");
+  HEDGE_RE.lastIndex = 0;
+  FILLER_RE.lastIndex = 0;
+  if (countMatches(HEDGE_RE, answer) + countMatches(FILLER_RE, answer) > 0)
+    changes.push("Clearer communication — hedges and filler words removed.");
+  if (!SITUATION_RE.test(answer) || filledSlots.includes("situation"))
+    changes.push("Better storytelling — opens with context so the interviewer can picture the scene.");
+  if (!changes.length)
+    changes.push("Tightened phrasing — same story, fewer words between the interviewer and the point.");
+
+  return { situation, task, action, result, improvedAnswer, changes, filledSlots };
 }
 
 // ----- Main entry -----
+
+
 
 export function scoreAnswer(question: string, answer: string): QA {
   const a = answer.trim();
