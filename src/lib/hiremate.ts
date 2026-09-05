@@ -54,6 +54,7 @@ export type Interview = {
   qas: QA[];
   overall: Metric;
   score: number;
+  durationSec?: number;
 };
 
 const KEY_PROFILE = "hiremate.profile";

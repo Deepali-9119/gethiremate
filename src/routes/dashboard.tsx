@@ -2,7 +2,27 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { getHistory, getProfile, weakAreas, type Interview, type Metric, type Profile } from "@/lib/hiremate";
 import { getSessions, type StoredSession } from "@/lib/sessions";
-import { streakDays } from "@/lib/habits";
+import {
+  streakDays,
+  questionsAnswered,
+  totalPracticeMinutes,
+  formatDuration,
+  weeklySeries,
+  monthlyStats,
+  mostImprovedSkill,
+  weakestSkill,
+  metricAverage,
+  metricSeries,
+  metricTrend,
+  readiness,
+  buildPracticePlan,
+  planSignature,
+  getPlanProgress,
+  setPlanProgress,
+  METRIC_LABELS,
+  WEEKLY_GOAL,
+  type PlanDay,
+} from "@/lib/habits";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -16,6 +36,12 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Clock,
+  MessageSquare,
+  CheckCircle2,
+  Circle,
+  CalendarRange,
+  Gauge,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
@@ -67,7 +93,11 @@ function Dashboard() {
 
   const weak = weakAreas(history);
   const topWeak = weak[0];
-  const recent = history.slice(0, 3);
+  const practiceMinutes = useMemo(() => totalPracticeMinutes(history), [history]);
+  const month = useMemo(() => monthlyStats(history), [history]);
+  const improved = useMemo(() => mostImprovedSkill(history), [history]);
+  const weakest = useMemo(() => weakestSkill(history), [history]);
+  const ready = useMemo(() => readiness(history), [history]);
 
   // Chronological for the chart (oldest → newest)
   const chartData = useMemo(() => [...history].reverse(), [history]);
@@ -130,17 +160,38 @@ function Dashboard() {
         ) : (
           <>
             {/* Stats overview */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <StatCard
-                icon={<Trophy className="h-5 w-5 text-coral" />}
-                value={String(stats.count)}
-                label="Interviews completed"
+                icon={<Flame className="h-5 w-5 text-coral" />}
+                value={String(stats.streak)}
+                label="Practice streak"
+                hint={stats.streak === 1 ? "1 day in a row" : `${stats.streak} days in a row`}
+              />
+              <StatCard
+                icon={<MessageSquare className="h-5 w-5 text-coral" />}
+                value={String(questionsAnswered(history))}
+                label="Questions answered"
               />
               <StatCard
                 icon={<TrendingUp className="h-5 w-5 text-coral" />}
                 value={`${stats.avg}`}
                 suffix="/100"
-                label="Average score"
+                label="Average interview score"
+              />
+              <StatCard
+                icon={<Clock className="h-5 w-5 text-coral" />}
+                value={practiceMinutes === null ? "—" : `${practiceMinutes}`}
+                suffix={practiceMinutes === null ? undefined : " min"}
+                label="Time practiced"
+                hint={practiceMinutes === null ? "Tracked from your next session" : undefined}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+              <StatCard
+                icon={<Trophy className="h-5 w-5 text-coral" />}
+                value={String(stats.count)}
+                label="Interviews completed"
               />
               <StatCard
                 icon={<Star className="h-5 w-5 text-coral" />}
@@ -149,11 +200,48 @@ function Dashboard() {
                 label="Best score"
               />
               <StatCard
-                icon={<Flame className="h-5 w-5 text-coral" />}
-                value={`${stats.streak}`}
-                label={stats.streak === 1 ? "Day streak" : "Day streak"}
-                hint={`${stats.streak} session${stats.streak === 1 ? "" : "s"} in a row`}
+                icon={<Gauge className="h-5 w-5 text-coral" />}
+                value={`${ready.score}`}
+                suffix="/100"
+                label="Interview readiness"
+                hint={ready.band}
               />
+              <StatCard
+                icon={<CalendarRange className="h-5 w-5 text-coral" />}
+                value={`${month.sessions}`}
+                label="Sessions this month"
+                hint={month.prevSessions ? `${month.prevSessions} last month` : "First month of practice"}
+              />
+            </div>
+
+            {/* Skill trends */}
+            <div className="grid sm:grid-cols-2 gap-4 mb-10">
+              <TrendCard title="Confidence trend" metric="confidence" history={history} />
+              <TrendCard title="Structure trend" metric="structure" history={history} />
+            </div>
+
+            {/* Most improved / weakest */}
+            <div className="grid sm:grid-cols-2 gap-4 mb-10">
+              <SkillCard
+                kind="improved"
+                label="Most improved skill"
+                name={improved ? METRIC_LABELS[improved.key] : "—"}
+                value={improved ? improved.avg : 0}
+                delta={improved ? improved.delta : null}
+              />
+              <SkillCard
+                kind="weak"
+                label="Weakest skill"
+                name={weakest ? METRIC_LABELS[weakest.key] : "—"}
+                value={weakest ? weakest.avg : 0}
+                delta={null}
+              />
+            </div>
+
+            {/* Weekly + monthly progress */}
+            <div className="grid lg:grid-cols-2 gap-4 mb-10">
+              <WeeklyProgress history={history} />
+              <MonthlyProgress month={month} />
             </div>
 
             {/* Progress snapshot — latest vs previous session */}
@@ -185,22 +273,20 @@ function Dashboard() {
               <LineChart data={chartData} best={stats.best} />
             </section>
 
-            {/* Recent sessions */}
+            {/* Interview history */}
             <section className="mb-10">
               <div className="flex items-end justify-between mb-4">
-                <h2 className="font-display text-2xl font-semibold">Recent sessions</h2>
-                {history.length > 3 && (
-                  <span className="text-xs text-muted-foreground">
-                    Showing 3 of {history.length}
-                  </span>
-                )}
+                <h2 className="font-display text-2xl font-semibold">Interview history</h2>
+                <span className="text-xs text-muted-foreground">
+                  {history.length} session{history.length === 1 ? "" : "s"}
+                </span>
               </div>
               <div className="rounded-3xl bg-card border border-border/70 overflow-hidden">
-                {recent.map((h, i) => (
+                {history.map((h, i) => (
                   <div
                     key={h.id}
                     className={`flex items-center justify-between gap-4 p-5 ${
-                      i < recent.length - 1 ? "border-b border-border/60" : ""
+                      i < history.length - 1 ? "border-b border-border/60" : ""
                     } hover:bg-secondary/40 transition`}
                   >
                     <div className="min-w-0 flex-1">
@@ -210,6 +296,8 @@ function Dashboard() {
                           day: "numeric",
                           year: "numeric",
                         })}
+                        {typeof h.durationSec === "number" && ` · ${formatDuration(h.durationSec)}`}
+                        {` · ${h.qas.length} question${h.qas.length === 1 ? "" : "s"}`}
                       </p>
                       <p className="font-display text-base sm:text-lg truncate">{h.role}</p>
                     </div>
@@ -232,6 +320,9 @@ function Dashboard() {
                 ))}
               </div>
             </section>
+
+            {/* 5-day practice plan */}
+            <PracticePlan history={history} role={history[0]?.role ?? profile?.role} />
 
             {/* Suggestion */}
             <SuggestionCard topWeak={topWeak} latestRole={history[0]?.role} />
@@ -617,6 +708,268 @@ function SessionHistory({ sessions }: { sessions: StoredSession[] }) {
               </div>
               <div className="font-display text-lg font-semibold tabular-nums shrink-0">
                 Score: {s.overall_score}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+/* ---------- coaching hub bits ---------- */
+
+function Sparkline({ values }: { values: number[] }) {
+  if (values.length < 2) {
+    return <div className="h-12 grid place-items-center text-xs text-muted-foreground">Two sessions needed for a trend</div>;
+  }
+  const W = 240;
+  const H = 48;
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 100);
+  const x = (i: number) => (i / (values.length - 1)) * W;
+  const y = (v: number) => H - ((v - min) / Math.max(1, max - min)) * H;
+  const d = values.map((v, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(v)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-12" preserveAspectRatio="none" role="img" aria-label="Skill trend">
+      <path d={d} fill="none" stroke="var(--color-coral)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r={3.5} fill="var(--color-coral)" />
+    </svg>
+  );
+}
+
+function TrendCard({
+  title,
+  metric,
+  history,
+}: {
+  title: string;
+  metric: keyof Metric;
+  history: Interview[];
+}) {
+  const avg = metricAverage(history, metric);
+  const trend = metricTrend(history, metric);
+  const delta = trend?.delta ?? null;
+  return (
+    <div className="rounded-3xl bg-card border border-border/70 p-6">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">{title}</p>
+          <p className="font-display text-3xl font-semibold tabular-nums mt-1">
+            {avg}
+            <span className="text-base text-muted-foreground font-normal">/100</span>
+          </p>
+        </div>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${
+            delta === null
+              ? "text-muted-foreground bg-secondary border-border/60"
+              : delta > 0
+                ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+                : delta < 0
+                  ? "text-coral bg-coral-soft border-coral/20"
+                  : "text-muted-foreground bg-secondary border-border/60"
+          }`}
+        >
+          {delta === null ? <Minus className="h-3.5 w-3.5" /> : delta > 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : delta < 0 ? <ArrowDownRight className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+          {delta === null ? "New" : delta > 0 ? `+${delta} since you started` : delta < 0 ? `${delta} since you started` : "Holding steady"}
+        </span>
+      </div>
+      <Sparkline values={metricSeries(history, metric)} />
+    </div>
+  );
+}
+
+function SkillCard({
+  kind,
+  label,
+  name,
+  value,
+  delta,
+}: {
+  kind: "improved" | "weak";
+  label: string;
+  name: string;
+  value: number;
+  delta: number | null;
+}) {
+  const improved = kind === "improved";
+  return (
+    <div
+      className={`rounded-3xl border p-6 ${
+        improved ? "bg-success/5 border-success/30" : "bg-warn/5 border-warn/40"
+      }`}
+    >
+      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-1">{label}</p>
+      <p className="font-display text-2xl font-semibold">{name}</p>
+      <p className="text-sm text-muted-foreground mt-1">
+        Averaging {value}/100
+        {delta !== null && delta > 0 ? ` · up ${delta} points` : ""}
+      </p>
+      <div className="h-2.5 rounded-full bg-secondary overflow-hidden mt-4">
+        <div
+          className={`h-full rounded-full ${improved ? "bg-success" : "bg-warn"}`}
+          style={{ width: `${Math.max(4, Math.min(100, value))}%` }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground mt-3">
+        {improved
+          ? "Keep leaning on this — it's your fastest-moving skill."
+          : "This is where your next few sessions should focus."}
+      </p>
+    </div>
+  );
+}
+
+function WeeklyProgress({ history }: { history: Interview[] }) {
+  const series = weeklySeries(history);
+  const done = series.reduce((s, d) => s + d.count, 0);
+  const max = Math.max(1, ...series.map((d) => d.count));
+  const pct = Math.min(100, Math.round((done / WEEKLY_GOAL) * 100));
+  return (
+    <section className="rounded-3xl bg-card border border-border/70 p-6">
+      <div className="flex items-end justify-between gap-3 mb-4">
+        <div>
+          <h2 className="font-display text-xl font-semibold">Weekly progress</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Last 7 days of practice.</p>
+        </div>
+        <span className="text-sm font-semibold tabular-nums">
+          {done}<span className="text-muted-foreground font-normal">/{WEEKLY_GOAL}</span>
+        </span>
+      </div>
+      <div className="h-2.5 rounded-full bg-secondary overflow-hidden mb-5">
+        <div className="h-full bg-coral rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex items-end justify-between gap-2 h-24">
+        {series.map((d) => (
+          <div key={d.date} className="flex-1 flex flex-col items-center gap-2">
+            <div
+              className={`w-full rounded-lg ${d.count ? "bg-coral" : "bg-secondary"}`}
+              style={{ height: `${d.count ? Math.max(14, (d.count / max) * 70) : 6}px` }}
+              title={`${d.count} session${d.count === 1 ? "" : "s"}`}
+            />
+            <span className="text-[11px] text-muted-foreground">{d.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MonthlyProgress({ month }: { month: ReturnType<typeof monthlyStats> }) {
+  const sessionDelta = month.sessions - month.prevSessions;
+  const avgDelta = month.prevAvg ? month.avg - month.prevAvg : null;
+  return (
+    <section className="rounded-3xl bg-card border border-border/70 p-6">
+      <h2 className="font-display text-xl font-semibold">Monthly progress</h2>
+      <p className="text-sm text-muted-foreground mt-0.5 mb-5">This month compared with last.</p>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-2xl bg-secondary/40 border border-border/60 p-5">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2">Sessions</p>
+          <p className="font-display text-3xl font-semibold tabular-nums">{month.sessions}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {month.prevSessions ? `${sessionDelta >= 0 ? "+" : ""}${sessionDelta} vs last month` : "No sessions last month"}
+          </p>
+        </div>
+        <div className="rounded-2xl bg-secondary/40 border border-border/60 p-5">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2">Average score</p>
+          <p className="font-display text-3xl font-semibold tabular-nums">
+            {month.avg || "—"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {avgDelta === null ? "No comparison yet" : `${avgDelta >= 0 ? "+" : ""}${avgDelta} vs last month`}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PracticePlan({ history, role }: { history: Interview[]; role?: string }) {
+  const plan = useMemo(() => buildPracticePlan(history, role), [history, role]);
+  const signature = useMemo(() => planSignature(plan), [plan]);
+  const [done, setDone] = useState<number[]>([]);
+
+  useEffect(() => {
+    setDone(getPlanProgress(signature));
+  }, [signature]);
+
+  const toggle = (day: number) => {
+    setDone((prev) => {
+      const next = prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day];
+      setPlanProgress(signature, next);
+      return next;
+    });
+  };
+
+  const reset = () => {
+    setDone([]);
+    setPlanProgress(signature, []);
+  };
+
+  const pct = Math.round((done.length / plan.length) * 100);
+
+  return (
+    <section className="mt-10 rounded-3xl bg-card border border-border/70 p-6 sm:p-8">
+      <div className="flex items-end justify-between flex-wrap gap-3 mb-4">
+        <div>
+          <h2 className="font-display text-2xl font-semibold">Your 5-day practice plan</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Built around your weakest skills. Tick each day as you finish it.
+          </p>
+        </div>
+        <div className="text-sm font-semibold tabular-nums">
+          {done.length} of {plan.length} done
+          {done.length === plan.length && (
+            <button onClick={reset} className="ml-3 text-xs font-medium text-coral hover:underline">
+              Start a new plan
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="h-2.5 rounded-full bg-secondary overflow-hidden mb-6">
+        <div className="h-full bg-coral rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+      </div>
+
+      <ol className="grid md:grid-cols-2 gap-4">
+        {plan.map((d: PlanDay) => {
+          const isDone = done.includes(d.day);
+          return (
+            <li
+              key={d.day}
+              className={`rounded-2xl border p-5 transition ${
+                isDone ? "bg-success/5 border-success/30" : "bg-peach border-coral/20"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => toggle(d.day)}
+                  aria-pressed={isDone}
+                  aria-label={`Mark day ${d.day} ${isDone ? "not done" : "done"}`}
+                  className="mt-0.5 shrink-0"
+                >
+                  {isDone ? (
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-ink/40" />
+                  )}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-ink/60 font-semibold">
+                    Day {d.day}
+                  </p>
+                  <p className={`font-display text-lg text-ink leading-snug ${isDone ? "line-through opacity-70" : ""}`}>
+                    {d.title}
+                  </p>
+                  <p className="text-sm text-ink/75 mt-1">{d.brief}</p>
+                  <p className="text-xs text-ink/60 mt-2">Drill: {d.drill}</p>
+                  <Link
+                    to="/onboarding"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-coral hover:underline"
+                  >
+                    Start this session <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
               </div>
             </li>
           );
