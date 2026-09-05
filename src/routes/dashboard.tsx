@@ -2,7 +2,27 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { getHistory, getProfile, weakAreas, type Interview, type Metric, type Profile } from "@/lib/hiremate";
 import { getSessions, type StoredSession } from "@/lib/sessions";
-import { streakDays } from "@/lib/habits";
+import {
+  streakDays,
+  questionsAnswered,
+  totalPracticeMinutes,
+  formatDuration,
+  weeklySeries,
+  monthlyStats,
+  mostImprovedSkill,
+  weakestSkill,
+  metricAverage,
+  metricSeries,
+  metricTrend,
+  readiness,
+  buildPracticePlan,
+  planSignature,
+  getPlanProgress,
+  setPlanProgress,
+  METRIC_LABELS,
+  WEEKLY_GOAL,
+  type PlanDay,
+} from "@/lib/habits";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -16,6 +36,12 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  Clock,
+  MessageSquare,
+  CheckCircle2,
+  Circle,
+  CalendarRange,
+  Gauge,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
@@ -67,7 +93,11 @@ function Dashboard() {
 
   const weak = weakAreas(history);
   const topWeak = weak[0];
-  const recent = history.slice(0, 3);
+  const practiceMinutes = useMemo(() => totalPracticeMinutes(history), [history]);
+  const month = useMemo(() => monthlyStats(history), [history]);
+  const improved = useMemo(() => mostImprovedSkill(history), [history]);
+  const weakest = useMemo(() => weakestSkill(history), [history]);
+  const ready = useMemo(() => readiness(history), [history]);
 
   // Chronological for the chart (oldest → newest)
   const chartData = useMemo(() => [...history].reverse(), [history]);
@@ -130,17 +160,38 @@ function Dashboard() {
         ) : (
           <>
             {/* Stats overview */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <StatCard
-                icon={<Trophy className="h-5 w-5 text-coral" />}
-                value={String(stats.count)}
-                label="Interviews completed"
+                icon={<Flame className="h-5 w-5 text-coral" />}
+                value={String(stats.streak)}
+                label="Practice streak"
+                hint={stats.streak === 1 ? "1 day in a row" : `${stats.streak} days in a row`}
+              />
+              <StatCard
+                icon={<MessageSquare className="h-5 w-5 text-coral" />}
+                value={String(questionsAnswered(history))}
+                label="Questions answered"
               />
               <StatCard
                 icon={<TrendingUp className="h-5 w-5 text-coral" />}
                 value={`${stats.avg}`}
                 suffix="/100"
-                label="Average score"
+                label="Average interview score"
+              />
+              <StatCard
+                icon={<Clock className="h-5 w-5 text-coral" />}
+                value={practiceMinutes === null ? "—" : `${practiceMinutes}`}
+                suffix={practiceMinutes === null ? undefined : " min"}
+                label="Time practiced"
+                hint={practiceMinutes === null ? "Tracked from your next session" : undefined}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+              <StatCard
+                icon={<Trophy className="h-5 w-5 text-coral" />}
+                value={String(stats.count)}
+                label="Interviews completed"
               />
               <StatCard
                 icon={<Star className="h-5 w-5 text-coral" />}
@@ -149,11 +200,48 @@ function Dashboard() {
                 label="Best score"
               />
               <StatCard
-                icon={<Flame className="h-5 w-5 text-coral" />}
-                value={`${stats.streak}`}
-                label={stats.streak === 1 ? "Day streak" : "Day streak"}
-                hint={`${stats.streak} session${stats.streak === 1 ? "" : "s"} in a row`}
+                icon={<Gauge className="h-5 w-5 text-coral" />}
+                value={`${ready.score}`}
+                suffix="/100"
+                label="Interview readiness"
+                hint={ready.band}
               />
+              <StatCard
+                icon={<CalendarRange className="h-5 w-5 text-coral" />}
+                value={`${month.sessions}`}
+                label="Sessions this month"
+                hint={month.prevSessions ? `${month.prevSessions} last month` : "First month of practice"}
+              />
+            </div>
+
+            {/* Skill trends */}
+            <div className="grid sm:grid-cols-2 gap-4 mb-10">
+              <TrendCard title="Confidence trend" metric="confidence" history={history} />
+              <TrendCard title="Structure trend" metric="structure" history={history} />
+            </div>
+
+            {/* Most improved / weakest */}
+            <div className="grid sm:grid-cols-2 gap-4 mb-10">
+              <SkillCard
+                kind="improved"
+                label="Most improved skill"
+                name={improved ? METRIC_LABELS[improved.key] : "—"}
+                value={improved ? improved.avg : 0}
+                delta={improved ? improved.delta : null}
+              />
+              <SkillCard
+                kind="weak"
+                label="Weakest skill"
+                name={weakest ? METRIC_LABELS[weakest.key] : "—"}
+                value={weakest ? weakest.avg : 0}
+                delta={null}
+              />
+            </div>
+
+            {/* Weekly + monthly progress */}
+            <div className="grid lg:grid-cols-2 gap-4 mb-10">
+              <WeeklyProgress history={history} />
+              <MonthlyProgress month={month} />
             </div>
 
             {/* Progress snapshot — latest vs previous session */}
@@ -185,22 +273,20 @@ function Dashboard() {
               <LineChart data={chartData} best={stats.best} />
             </section>
 
-            {/* Recent sessions */}
+            {/* Interview history */}
             <section className="mb-10">
               <div className="flex items-end justify-between mb-4">
-                <h2 className="font-display text-2xl font-semibold">Recent sessions</h2>
-                {history.length > 3 && (
-                  <span className="text-xs text-muted-foreground">
-                    Showing 3 of {history.length}
-                  </span>
-                )}
+                <h2 className="font-display text-2xl font-semibold">Interview history</h2>
+                <span className="text-xs text-muted-foreground">
+                  {history.length} session{history.length === 1 ? "" : "s"}
+                </span>
               </div>
               <div className="rounded-3xl bg-card border border-border/70 overflow-hidden">
-                {recent.map((h, i) => (
+                {history.map((h, i) => (
                   <div
                     key={h.id}
                     className={`flex items-center justify-between gap-4 p-5 ${
-                      i < recent.length - 1 ? "border-b border-border/60" : ""
+                      i < history.length - 1 ? "border-b border-border/60" : ""
                     } hover:bg-secondary/40 transition`}
                   >
                     <div className="min-w-0 flex-1">
@@ -210,6 +296,8 @@ function Dashboard() {
                           day: "numeric",
                           year: "numeric",
                         })}
+                        {typeof h.durationSec === "number" && ` · ${formatDuration(h.durationSec)}`}
+                        {` · ${h.qas.length} question${h.qas.length === 1 ? "" : "s"}`}
                       </p>
                       <p className="font-display text-base sm:text-lg truncate">{h.role}</p>
                     </div>
@@ -232,6 +320,9 @@ function Dashboard() {
                 ))}
               </div>
             </section>
+
+            {/* 5-day practice plan */}
+            <PracticePlan history={history} role={history[0]?.role ?? profile?.role} />
 
             {/* Suggestion */}
             <SuggestionCard topWeak={topWeak} latestRole={history[0]?.role} />
