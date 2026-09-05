@@ -58,6 +58,7 @@ function Interview() {
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
   const [done, setDone] = useState(false);
+  const startedAtRef = useRef<number>(Date.now());
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -151,6 +152,7 @@ function Interview() {
       qas,
       overall,
       score,
+      durationSec: Math.max(30, Math.round((Date.now() - startedAtRef.current) / 1000)),
     };
     saveInterview(interview);
 
