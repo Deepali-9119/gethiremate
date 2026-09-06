@@ -1,72 +1,93 @@
-# Interview Companion
+# 💼 HireMate — AI Interview Preparation Platform
 
-Build a high-fidelity prototype for an AI-powered interview preparation platform called “HireMate”.
+**An AI-powered interview preparation product that simulates interviews, adapts question difficulty based on user responses, and provides structured feedback to help job seekers improve.**
 
-Goal: Help users simulate real interviews and improve performance using AI-driven feedback.
+*AI Product Prototype · Product Strategy · Conversational AI · Lovable*
 
-Design this as a conversational AI product (similar to ChatGPT UX).
+[![Live Demo](https://img.shields.io/badge/Demo-Live-brightgreen?style=flat-square)](https://gethiremate.lovable.app)
 
-Include:
+---
 
-Smart onboarding
+## 📌 Problem Statement
 
-Ask user goal (job role, experience level)
+Job seekers often lack access to realistic interview practice. Existing resources — mock question lists, YouTube tutorials, and generic tips — are **static and one-directional**.
 
-Optional resume upload
+They don't adapt to the user's skill level, provide personalized feedback, or simulate the conversational flow of an interview.
 
-Interview Engine
+**Target User**: Job seekers who want to practice interviews in a realistic, conversational setting with actionable feedback.
 
-Dynamic AI-generated questions
+---
 
-Adaptive difficulty based on answers
+## 💡 Solution
 
-Feedback System
+HireMate is a conversational AI interview preparation product.
 
-Per-answer feedback
+It adapts question difficulty based on user responses and provides structured feedback after each answer, followed by a comprehensive scorecard at the end of the session.
 
-Metrics: clarity, structure, confidence, relevance
+The product uses a chat-based interface to create a more natural interview experience, where users respond through a conversational flow rather than filling out forms.
 
-Final scorecard with actionable insights
+---
 
-Dashboard
+## ✨ Key Features
 
-Past interviews
+| Feature | Description |
+|---------|-------------|
+| Smart Onboarding | Collects job role, experience level, and optional resume information to personalize the session |
+| AI Interview Engine | Dynamic question generation with adaptive difficulty based on answer quality |
+| Real-time Feedback | Per-answer feedback on clarity, structure, confidence, and relevance |
+| Session Scorecard | Comprehensive final scorecard with actionable improvement insights |
+| Progress Dashboard | Past interviews, progress tracking, and weak-area identification |
+| Chat-based UX | Conversational interface with card-based feedback for easier scanning |
 
-Progress tracking
+---
 
-Weak areas
+## 🎯 Product Thinking & PM Insights
 
-UI/UX
+### Core Interaction Loop
 
-Minimal, distraction-free
+> **Onboarding (role + level) → AI Asks Question → User Responds → Real-time Feedback → Adaptive Next Question → Final Scorecard**
 
-Chat-based interaction
+### Feedback Framework
 
-Use cards for feedback
+Each response is evaluated on four dimensions:
 
-Clear CTA buttons
+- **Clarity**: How clearly the answer communicates the point
+- **Structure**: Use of frameworks such as STAR and logical flow
+- **Confidence**: Tone, conviction, and specificity
+- **Relevance**: Direct applicability to the question asked
 
-Also suggest UX improvements and microcopy for better engagement.
+### Design Decisions
 
-This project was built with [Lovable](https://lovable.dev).
+| Decision | Rationale |
+|----------|-----------|
+| Chat-based UX | Creates a more natural interview flow and reduces form-like interaction |
+| Card-based feedback | Makes feedback easier to scan and act on |
+| Adaptive difficulty | Adjusts the challenge level based on the user's responses |
+| Optional resume input | Allows personalization without making resume upload mandatory |
 
-**Live app**: https://gethiremate.lovable.app
+### Iteration & Refinement
 
-## Build with Lovable
+HireMate has **142 commits**, making it my most iterated project.
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/01a30cf8-907d-49f0-aad0-e82b1df728a0).
+Through multiple rounds of refinement, I chose to prioritize the **feedback loop** rather than simply increasing question difficulty. This shaped the product toward actionable feedback and structured evaluation alongside adaptive questioning.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+---
 
-## Development
+## 🛠️ Prototype & Implementation
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+HireMate was developed as an AI-assisted product prototype using **Lovable**.
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+The prototype focuses on exploring the interview experience, adaptive questioning, feedback design, and overall product flow.
+
+---
+
+## 📝 What I Learned
+
+- **Conversational AI UX**: Chat-based products require different interaction patterns from traditional forms, including thoughtful response presentation and visual hierarchy
+- **Adaptive systems**: Designing feedback loops that adjust difficulty helped me explore how personalization can shape the user experience
+- **Iterative product development**: 142 commits reinforced the importance of continuous refinement rather than trying to create a perfect first version
+- **Metrics-driven feedback**: Structuring qualitative feedback into dimensions such as clarity, structure, confidence, and relevance makes improvement areas easier to evaluate and communicate
+
+---
+
+*Built by [Deepali Shah](https://github.com/Deepali-9119) · Aspiring Product Manager | AI Product Builder*
